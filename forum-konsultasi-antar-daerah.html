@@ -121,7 +121,7 @@ body.wi-active::before{
 }
 .pcard{padding:20px 22px;border-radius:var(--radius);background:var(--surface);
   border:1px solid var(--line);margin-bottom:14px;animation:pop .4s var(--ease) both}
-.pcard h4{font-size:11.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+.pcard h4{font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
   color:var(--text-dim);margin-bottom:12px}
 .phint{border-left:3px solid var(--accent);font-size:14.5px;line-height:1.6;color:var(--text-dim)}
 body.wi-active .phint{border-left-color:var(--accent-2)}
@@ -129,7 +129,7 @@ body.wi-active .phint{border-left-color:var(--accent-2)}
 .prow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
   padding:10px 0;border-bottom:1px dashed var(--line)}
 .prow:last-child{border-bottom:none;padding-bottom:0}
-.prow .pv{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.prow .pv{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
 .prow .pl{font-size:13px;color:var(--text-dim);font-weight:600;text-align:right;line-height:1.35}
 .pchips{display:flex;flex-wrap:wrap;gap:7px;max-height:240px;overflow-y:auto}
 .pchip{padding:7px 13px;border-radius:999px;background:var(--surface-2);
@@ -149,7 +149,7 @@ body.wi-active .phint{border-left-color:var(--accent-2)}
   box-shadow:var(--shadow);padding:6px;animation:pop .2s var(--ease) both}
 body.wi-active .combo-pop{border-color:var(--accent-2)}
 .combo-pop[hidden]{display:none}
-.combo-grp{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+.combo-grp{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
   color:var(--text-dim);padding:10px 12px 6px}
 /* flex-wrap: bila sisa ruang kurang, provinsi turun ke baris kedua — tidak
    pernah menimpa nama. Nama sendiri tidak pernah dipotong tengah kata. */
@@ -162,7 +162,7 @@ body.wi-active .combo-pop{border-color:var(--accent-2)}
 .combo-opt:hover,.combo-opt.act{background:var(--accent-soft)}
 .combo-opt.act .cn{color:var(--accent)}
 body.wi-active .combo-opt:hover,body.wi-active .combo-opt.act{background:var(--accent-2-soft)}
-.combo-opt mark{background:none;color:var(--accent);font-weight:800}
+.combo-opt mark{background:none;color:var(--accent);font-weight:700}
 .combo-empty{padding:14px 12px;color:var(--text-dim);font-size:14.5px;line-height:1.5}
 
 /* ============================================================
@@ -232,7 +232,7 @@ textarea.field{resize:vertical;min-height:110px;line-height:1.55}
 }
 .role-switch .seg{
   display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:999px;
-  font-size:13px;font-weight:800;letter-spacing:.06em;color:var(--text-dim);
+  font-size:13px;font-weight:600;letter-spacing:.06em;color:var(--text-dim);
   transition:color .25s var(--ease),background .3s var(--ease),box-shadow .3s var(--ease);
 }
 .role-switch .seg .dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.45;
@@ -264,9 +264,9 @@ body.wi-active .role-switch{border-color:var(--accent-2)}
 body.wi-active .rail{border-color:var(--accent-2)}
 .rail-step{display:flex;align-items:center;gap:13px;opacity:.38;transition:opacity .45s var(--ease)}
 .rail-step .rn{width:36px;height:36px;flex:none;border-radius:50%;display:grid;place-items:center;
-  font-size:14.5px;font-weight:800;border:2px solid var(--line);color:var(--text-dim);
+  font-size:14.5px;font-weight:700;border:2px solid var(--line);color:var(--text-dim);
   transition:all .45s var(--ease)}
-.rail-step b{display:block;font-size:15.5px;font-weight:800;letter-spacing:-.01em;white-space:nowrap}
+.rail-step b{display:block;font-size:15.5px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
 .rail-step i{display:block;font-size:12.5px;font-style:normal;color:var(--text-dim);margin-top:1px;white-space:nowrap}
 .rail-step.done{opacity:.8}
 .rail-step.done .rn{background:var(--accent);border-color:transparent;color:var(--on-accent)}
@@ -286,10 +286,10 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
   border-left:4px solid var(--accent);margin-bottom:18px;
   transition:border-color .45s var(--ease),background .45s var(--ease)}
 .obj.done{border-left-color:var(--accent-2);background:var(--accent-2-soft)}
-.obj .ot{font-size:11.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--accent)}
+.obj .ot{font-size:11.5px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--accent)}
 .obj.done .ot{color:var(--accent-2)}
 .obj .od{font-size:16.5px;font-weight:600;margin-top:3px}
-.obj .ocount{font-size:14.5px;font-weight:800;color:var(--text-dim);flex:none;
+.obj .ocount{font-size:14.5px;font-weight:600;color:var(--text-dim);flex:none;
   font-variant-numeric:tabular-nums;white-space:nowrap}
 .obj.done .ocount{color:var(--accent-2)}
 .pips{display:flex;gap:7px;flex:none}
@@ -388,8 +388,8 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
 /* ---- Layar pembuka ---- */
 .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center;
   padding:64px 0 40px;min-height:64vh}
-.hero h2{font-size:clamp(38px,4.6vw,60px);line-height:1.04;letter-spacing:-.035em;font-weight:800}
-.hero .kicker{font-size:13px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;
+.hero h2{font-size:clamp(38px,4.6vw,60px);line-height:1.04;letter-spacing:-.035em;font-weight:700}
+.hero .kicker{font-size:13px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;
   color:var(--accent);margin-bottom:18px}
 .hero p.lead{font-size:19px;color:var(--text-dim);line-height:1.6;margin:22px 0 34px;max-width:52ch}
 .hero-art{width:100%;height:auto}
@@ -407,7 +407,7 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
 .stat::after{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
 .stat:nth-child(2)::after{background:var(--accent-2)}
 .stat:nth-child(3)::after{background:var(--text-dim)}
-.stat .num{font-size:52px;font-weight:800;letter-spacing:-.04em;line-height:1;
+.stat .num{font-size:52px;font-weight:700;letter-spacing:-.04em;line-height:1;
   font-variant-numeric:tabular-nums}
 .stat .lbl{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
   color:var(--text-dim);margin-top:10px}
@@ -415,7 +415,7 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
 @keyframes bump{0%{transform:scale(1)}35%{transform:scale(1.14);color:var(--accent)}100%{transform:scale(1)}}
 
 .sec-head{display:flex;align-items:center;gap:14px;margin:34px 0 16px}
-.sec-head h3{font-size:15px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--text-dim)}
+.sec-head h3{font-size:15px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--text-dim)}
 .sec-head .line{flex:1;height:1px;background:var(--line)}
 
 .chips{display:flex;flex-wrap:wrap;gap:10px;min-height:44px}
@@ -436,13 +436,13 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
   animation:pop .4s var(--ease) both;
 }
 .tl-item:hover{transform:translateX(5px);border-color:var(--accent)}
-.tl-idx{font-size:13px;font-weight:800;color:var(--text-dim);width:28px;flex:none;
+.tl-idx{font-size:13px;font-weight:600;color:var(--text-dim);width:28px;flex:none;
   font-variant-numeric:tabular-nums}
 .tl-body{flex:1;min-width:0}
-.tl-body .d{font-size:12.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--accent)}
+.tl-body .d{font-size:12.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--accent)}
 .tl-body .t{font-size:19px;font-weight:700;margin-top:3px;letter-spacing:-.01em;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pill{padding:7px 14px;border-radius:999px;font-size:12px;font-weight:800;
+.pill{padding:7px 14px;border-radius:999px;font-size:12px;font-weight:600;
   letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;flex:none;
   border:1px solid var(--line);color:var(--text-dim)}
 .pill.s-baru{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
@@ -453,7 +453,7 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
 .kunci-item{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;padding:12px 16px;border:1px solid var(--line);border-radius:var(--radius-sm)}
 .kunci-item .t{flex:1 1 220px;min-width:0}
 .kunci-item .btn{white-space:nowrap}
-.kunci-item .t small{display:block;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.kunci-item .t small{display:block;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
 
 .cta-bar{display:flex;gap:14px;flex-wrap:wrap;margin-top:34px;
   padding-top:26px;border-top:1px solid var(--line)}
@@ -462,7 +462,7 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
 .data-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;
   padding:14px 20px;border-radius:var(--radius);background:var(--surface);
   border:1px solid var(--line)}
-.data-bar .db-lbl{font-size:11.5px;font-weight:800;letter-spacing:.11em;
+.data-bar .db-lbl{font-size:11.5px;font-weight:600;letter-spacing:.11em;
   text-transform:uppercase;color:var(--text-dim)}
 .data-bar .db-status{font-size:13.5px;font-weight:600;color:var(--text-dim);
   flex:1;min-width:220px}
@@ -473,7 +473,7 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
 /* ---- Konteks masalah aktif ---- */
 .ctx{padding:30px 34px;border-radius:var(--radius);background:var(--surface);
   border:1px solid var(--line);border-left:5px solid var(--accent);margin-bottom:26px}
-.ctx .d{font-size:13px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--accent)}
+.ctx .d{font-size:13px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--accent)}
 .ctx h2{font-size:clamp(28px,3vw,38px);line-height:1.15;letter-spacing:-.03em;margin:8px 0 12px}
 .ctx p{color:var(--text-dim);font-size:17px;line-height:1.62;white-space:pre-wrap}
 
@@ -482,7 +482,7 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
 .resp{padding:18px 22px;border-radius:var(--radius-sm);background:var(--surface);
   border:1px solid var(--line);border-left:3px solid var(--accent-2);
   animation:pop .4s var(--ease) both;position:relative}
-.resp .who{font-size:13px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--accent-2)}
+.resp .who{font-size:13px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--accent-2)}
 .resp .txt{font-size:17px;line-height:1.55;margin-top:6px;white-space:pre-wrap}
 .resp .del{position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:8px;
   color:var(--text-dim);font-size:18px;line-height:1;opacity:0;transition:opacity .2s}
@@ -502,13 +502,13 @@ body.wi-active .field:focus{border-color:var(--accent-2);box-shadow:0 0 0 4px va
   60%{opacity:1;transform:scale(1.01)}
   100%{opacity:1;transform:none}
 }
-.wi-banner .t1{font-size:clamp(24px,2.6vw,34px);font-weight:800;letter-spacing:-.02em;color:var(--accent-2)}
+.wi-banner .t1{font-size:clamp(24px,2.6vw,34px);font-weight:700;letter-spacing:-.02em;color:var(--accent-2)}
 .wi-banner .t2{font-size:14.5px;color:var(--text-dim);font-weight:600;margin-top:3px}
 .wi-banner .seal{width:52px;height:52px;flex:none}
 .locked{opacity:.42;filter:grayscale(.5);pointer-events:none;transition:opacity .4s var(--ease)}
 .brief{padding:24px 28px;border-radius:var(--radius);background:var(--surface-2);
   border:1px dashed var(--line);margin-bottom:26px;max-height:38vh;overflow-y:auto}
-.brief .bh{font-size:12.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+.brief .bh{font-size:12.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
   color:var(--text-dim);margin-bottom:12px}
 .brief ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:9px}
 .brief li{font-size:16px;line-height:1.5}
@@ -522,7 +522,7 @@ body.wi-active .field:focus{border-color:var(--accent-2);box-shadow:0 0 0 4px va
   margin-bottom:14px;overflow:hidden}
 .acc-head{width:100%;display:flex;align-items:center;gap:16px;padding:22px 26px;text-align:left}
 .acc-head:hover{background:var(--surface-2)}
-.acc-head .nm{font-size:22px;font-weight:800;letter-spacing:-.02em;flex:1}
+.acc-head .nm{font-size:22px;font-weight:700;letter-spacing:-.02em;flex:1}
 .acc-head .cnt{font-size:13px;font-weight:700;color:var(--text-dim)}
 .acc-head .car{transition:transform .3s var(--ease);color:var(--text-dim)}
 .acc.open .car{transform:rotate(90deg)}
@@ -532,7 +532,7 @@ body.wi-active .field:focus{border-color:var(--accent-2);box-shadow:0 0 0 4px va
 .rk-block:last-child{border-bottom:none}
 .rk-block h4{font-size:20px;letter-spacing:-.02em;margin-bottom:6px}
 .rk-block .desc{color:var(--text-dim);font-size:16px;line-height:1.55;white-space:pre-wrap}
-.rk-lbl{font-size:11.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;
+.rk-lbl{font-size:11.5px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;
   color:var(--text-dim);margin:16px 0 8px}
 .rk-list{padding-left:20px;display:flex;flex-direction:column;gap:7px}
 .rk-list li{font-size:16px;line-height:1.5}
@@ -568,16 +568,16 @@ select.field{padding:13px 14px;font-size:15px;font-weight:600}
 .tuntas-card .seal-path{stroke-dasharray:42;stroke-dashoffset:42;
   animation:tarik .55s var(--ease) .3s forwards}
 @keyframes tarik{to{stroke-dashoffset:0}}
-.tuntas-card .lbl{font-size:12.5px;font-weight:800;letter-spacing:.18em;
+.tuntas-card .lbl{font-size:12.5px;font-weight:600;letter-spacing:.18em;
   text-transform:uppercase;color:var(--accent-2)}
-.tuntas-card .d{font-size:13.5px;font-weight:800;letter-spacing:.09em;
+.tuntas-card .d{font-size:13.5px;font-weight:600;letter-spacing:.09em;
   text-transform:uppercase;color:var(--text-dim);margin-top:14px}
 .tuntas-card h2{font-size:clamp(26px,3.3vw,40px);letter-spacing:-.03em;
   margin:6px 0 0;line-height:1.16}
 .tuntas-card .meta{margin-top:26px;padding-top:24px;border-top:1px solid var(--line);
   display:flex;gap:44px;justify-content:center;flex-wrap:wrap}
 .tuntas-card .meta span{font-size:14px;color:var(--text-dim);font-weight:600}
-.tuntas-card .meta b{display:block;font-size:30px;color:var(--text);font-weight:800;
+.tuntas-card .meta b{display:block;font-size:30px;color:var(--text);font-weight:700;
   letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin-bottom:2px}
 /* sorotan singkat pada baris timeline yang baru saja tuntas */
 @keyframes tuntasSorot{
@@ -589,10 +589,10 @@ select.field{padding:13px 14px;font-size:15px;font-weight:600}
 
 /* ---- Layar Penutupan Sesi ---- */
 .tutup-head{text-align:center;padding:10px 0 26px}
-.tutup-head .kick{font-size:12.5px;font-weight:800;letter-spacing:.2em;
+.tutup-head .kick{font-size:12.5px;font-weight:600;letter-spacing:.2em;
   text-transform:uppercase;color:var(--accent-2)}
 .tutup-head h2{font-size:clamp(32px,4.2vw,52px);letter-spacing:-.035em;
-  line-height:1.06;margin:14px 0 10px;font-weight:800}
+  line-height:1.06;margin:14px 0 10px;font-weight:700}
 .tutup-head p{color:var(--text-dim);font-size:17px;font-weight:600}
 .jaring-besar text{font-size:17px}
 .take-list{counter-reset:tk;list-style:none;padding:0;display:flex;
@@ -601,9 +601,9 @@ select.field{padding:13px 14px;font-size:15px;font-weight:600}
   background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent-2);
   animation:pop .45s var(--ease) both}
 .take-list li::before{counter-increment:tk;content:counter(tk);position:absolute;
-  left:26px;top:21px;font-size:23px;font-weight:800;color:var(--accent-2);
+  left:26px;top:21px;font-size:23px;font-weight:700;color:var(--accent-2);
   font-variant-numeric:tabular-nums}
-.take-list .th{font-size:12.5px;font-weight:800;letter-spacing:.08em;
+.take-list .th{font-size:12.5px;font-weight:600;letter-spacing:.08em;
   text-transform:uppercase;color:var(--accent)}
 .take-list .tt{font-size:19px;font-weight:700;margin:3px 0 9px;letter-spacing:-.01em}
 .take-list .tb{font-size:16.5px;line-height:1.6;color:var(--text-dim);white-space:pre-wrap}
@@ -675,10 +675,10 @@ select.field{padding:13px 14px;font-size:15px;font-weight:600}
 .lg-card{position:relative;z-index:6;padding:22px 26px;border-radius:var(--radius);background:var(--surface);
   border:1.5px solid var(--liga);margin-bottom:22px;animation:pop .4s var(--ease) both}
 .lg-card.redup{border-color:var(--line);border-style:dashed;padding:14px 22px}
-.lg-kick{font-size:11.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--liga)}
+.lg-kick{font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--liga)}
 .lg-card h4{font-size:19px;letter-spacing:-.01em;margin:4px 0 10px}
 .blok-judul{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;margin:0 0 10px;
-  font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text)}
+  font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text)}
 .blok-judul small{font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--text-dim)}
 .lg-card p.lg-sub{color:var(--text-dim);font-size:14.5px;line-height:1.55}
 .lg-grid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:26px;margin-top:14px;align-items:start}
@@ -693,11 +693,11 @@ select.field{padding:13px 14px;font-size:15px;font-weight:600}
   border:1.5px solid transparent;position:relative;transition:border-color .25s var(--ease)}
 .lg-bid.giliran{border-color:var(--accent-2)}
 .lg-bid.pilih{border-color:var(--liga);background:var(--liga-soft)}
-.lg-bid .nm{font-weight:800;font-size:16px}
+.lg-bid .nm{font-weight:700;font-size:16px}
 .lg-bid .dr{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim)}
 .lg-bid .kp{font-size:15px;line-height:1.5;margin-top:6px;white-space:pre-wrap}
 .lg-bid .jw{font-size:13.5px;color:var(--text-dim);margin-top:6px;line-height:1.45}
-.lg-bid .src{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+.lg-bid .src{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
   color:var(--text-dim);margin-left:8px}
 .lg-bid .aksi{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
 .lg-bid .aksi .btn{padding:8px 14px;font-size:13.5px}
@@ -732,17 +732,17 @@ select.field{padding:13px 14px;font-size:15px;font-weight:600}
 .pod.r1{order:2;padding-top:40px;padding-bottom:40px;background:var(--liga-soft);box-shadow:var(--shadow)}
 .pod.r2{order:1}.pod.r3{order:3}
 .pod.rata{order:0}   /* seri: urutan asli, tanpa susunan tengah-kiri-kanan */
-.pod .rk{font-size:14px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--liga)}
-.pod .nm{font-size:clamp(20px,2.2vw,28px);font-weight:800;letter-spacing:-.02em;margin:10px 0 4px;line-height:1.2}
+.pod .rk{font-size:14px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--liga)}
+.pod .nm{font-size:clamp(20px,2.2vw,28px);font-weight:700;letter-spacing:-.02em;margin:10px 0 4px;line-height:1.2}
 .pod .dr{font-size:14px;color:var(--text-dim);font-weight:600}
-.pod .sk{font-size:clamp(40px,5vw,64px);font-weight:800;letter-spacing:-.04em;margin-top:12px;
+.pod .sk{font-size:clamp(40px,5vw,64px);font-weight:700;letter-spacing:-.04em;margin-top:12px;
   font-variant-numeric:tabular-nums;color:var(--liga)}
 .pod .sk small{font-size:15px;letter-spacing:0;color:var(--text-dim);font-weight:700;margin-left:4px}
 .pod .srt{display:inline-block;margin-top:12px;padding:6px 14px;border-radius:999px;
-  background:var(--liga);color:var(--on-liga);font-size:12.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+  background:var(--liga);color:var(--on-liga);font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
 @media (max-width:760px){.podium{grid-template-columns:1fr !important}.pod.r1,.pod.r2,.pod.r3{order:0}}
 .lg-rest{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:1100px;margin:34px auto 0}
-.lg-r{padding:12px 20px;border-radius:12px;color:var(--on-liga);font-weight:800;font-size:16px;
+.lg-r{padding:12px 20px;border-radius:12px;color:var(--on-liga);font-weight:700;font-size:16px;
   animation:pop .5s var(--ease) both}
 .lg-r span{font-weight:600;font-size:13px;opacity:.75;margin-left:6px}
 .lg-tbl{width:100%;border-collapse:collapse;font-size:14.5px}
@@ -2845,7 +2845,7 @@ function hapusMasalah(id){
 function lihatDetail(id){
   const m = cari(id); if(!m) return;
   document.getElementById('modalBody').innerHTML = `
-    <div class="d" style="font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)">${esc(m.daerah)}</div>
+    <div class="d" style="font-size:13px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)">${esc(m.daerah)}</div>
     <h2 style="font-size:30px;letter-spacing:-.03em;margin:8px 0 14px">${esc(m.judul)}</h2>
     <p style="color:var(--text-dim);font-size:17px;line-height:1.6;white-space:pre-wrap">${esc(m.deskripsi)}</p>
     <div class="rk-lbl">Tanggapan antar-daerah</div>
