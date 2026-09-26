@@ -11,6 +11,11 @@ Dokumen ini bisa dicetak dan ditaruh di sebelah laptop.
 > **Sudah punya, tapi mau pastikan versi terbaru?** Klik dua kali
 > `ORBIT-update.bat` di folder yang sama. Data peserta dan arsip Liga Inovasi
 > tidak ikut terhapus — hanya berkas aplikasinya yang diperbarui.
+>
+> **Malas buka folder tiap mau update?** Klik dua kali `ORBIT-buat-shortcut-update.bat`
+> **sekali saja** — muncul ikon baru **"Update ORBIT"** di Desktop. Sesudah itu,
+> tinggal klik dua kali ikon itu kapan saja untuk menarik versi terbaru,
+> tanpa perlu buka folder ini lagi.
 
 ---
 

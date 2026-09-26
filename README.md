@@ -23,3 +23,9 @@ menggantikan berkas aplikasinya saja.
 - Data peserta dan arsip Liga Inovasi **tidak ikut terhapus atau tertimpa**.
 - Berkas versi lama disalin dulu ke folder `cadangan-sebelum-update` sebelum
   diganti, jadi bisa dikembalikan manual kalau ada yang tidak beres.
+
+### Malas buka folder tiap mau update?
+
+Klik dua kali **`ORBIT-buat-shortcut-update.bat`** satu kali saja — ini
+membuat ikon **"Update ORBIT"** di Desktop. Sesudah itu, PTP tinggal klik dua
+kali ikon itu kapan saja untuk update, tanpa perlu buka folder ini lagi.
