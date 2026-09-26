@@ -990,7 +990,7 @@ body.mode-standar #panel{display:none!important}
     <div class="data-bar">
       <span class="db-lbl">Data Sesi</span>
       <span class="db-status" id="dbStatus">Tersimpan di browser ini saja</span>
-      <button class="btn btn-ghost" id="btnSambung" onclick="sambungkanBerkas()">Hubungkan Berkas</button>
+      <button class="btn btn-ghost" id="btnSambung" onclick="sambungkanBerkas()">Simpan Otomatis</button>
       <button class="btn btn-ghost" onclick="unduhSesi()">⤓ Simpan ke Berkas</button>
       <button class="btn btn-ghost" onclick="muatBerkasSesi()">⤒ Muat dari Berkas</button>
       <input type="file" id="berkasMasuk" accept="application/json,.json" style="display:none">
@@ -1461,10 +1461,10 @@ async function sambungkanBerkas(){
     return;
   }
   if(berkasHandle){
-    if(!confirm('Putuskan sambungan ke berkas "' + berkasHandle.name + '"?\n\nData tetap ada di browser ini, tapi tidak lagi tersimpan otomatis ke berkas.')) return;
+    if(!confirm('Matikan simpan otomatis ke berkas "' + berkasHandle.name + '"?\n\nData tetap ada di browser ini, tapi tidak lagi tersimpan otomatis ke berkas.')) return;
     berkasHandle = null; terakhirTulis = null;
     await lupakanHandle(); statusBerkas();
-    toast('Sambungan berkas diputus.'); return;
+    toast('Simpan otomatis dimatikan.'); return;
   }
   try{
     berkasHandle = await window.showSaveFilePicker({
@@ -1474,7 +1474,7 @@ async function sambungkanBerkas(){
     await simpanHandle(berkasHandle);
     await tulisBerkas(true);
     statusBerkas();
-    toast('Tersambung ke ' + berkasHandle.name + ' — perubahan tersimpan otomatis.');
+    toast('Simpan otomatis aktif ke ' + berkasHandle.name + '.');
   }catch(e){ /* pengguna membatalkan pemilih berkas */ }
 }
 
@@ -1502,13 +1502,13 @@ function statusBerkas(keadaan){
   if(!berkasHandle){
     el.className = 'db-status';
     el.innerHTML = 'Tersimpan di browser ini saja — <b>tidak terbawa</b> ke laptop lain';
-    tb.textContent = 'Hubungkan Berkas';
+    tb.textContent = 'Simpan Otomatis';
     return;
   }
-  tb.textContent = 'Putuskan Berkas';
+  tb.textContent = 'Matikan Otomatis';
   if(keadaan === 'izin'){
     el.className = 'db-status';
-    el.innerHTML = 'Perlu izin ulang untuk <b>' + esc(berkasHandle.name) + '</b> — klik Hubungkan Berkas';
+    el.innerHTML = 'Perlu izin ulang untuk <b>' + esc(berkasHandle.name) + '</b> — klik Simpan Otomatis';
   }else if(keadaan === 'gagal'){
     el.className = 'db-status';
     el.innerHTML = 'Gagal menulis ke <b>' + esc(berkasHandle.name) + '</b>';
