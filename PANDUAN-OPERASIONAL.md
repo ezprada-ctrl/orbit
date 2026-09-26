@@ -4,6 +4,10 @@
 Panduan pengoperasian aplikasi di kelas. Disusun untuk PTP (operator) dan WI (pemandu).
 Dokumen ini bisa dicetak dan ditaruh di sebelah laptop.
 
+> **Belum punya aplikasinya?** Unduh di sini:
+> **https://github.com/ezprada-ctrl/orbit/releases/latest**
+> Klik `ORBIT.zip`, ekstrak ke folder mana saja di laptop, lalu ikuti Bagian 0 di bawah.
+
 ---
 
 ## Daftar Isi
