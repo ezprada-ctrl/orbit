@@ -983,8 +983,10 @@ body.mode-standar #panel{display:none!important}
         onclick="bukaTutup()">Tutup Sesi &amp; Tampilkan Hasil</button>
       <button class="btn btn-ghost" id="lanjutBtn" style="display:none" onclick="lanjutkanAktif()">Lanjutkan pembahasan aktif →</button>
       <button class="btn btn-liga btn-lg" onclick="bukaLiga()">Liga Inovasi</button>
-      <button class="btn btn-ghost" style="margin-left:auto" onclick="muatContoh(12,50)"
-        title="Ganti isi sesi dengan data contoh untuk melihat tampilan saat penuh">Data Contoh</button>
+      <button class="btn btn-ghost" id="btnKembaliContoh" style="display:none;margin-left:auto;color:var(--warn);border-color:var(--warn)"
+        onclick="kembaliDariContoh()" title="Kembalikan data sesi asli, sebelum data contoh dimuat">↺ Kembali ke Data Asli</button>
+      <button class="btn btn-ghost" id="btnDataContoh" style="margin-left:auto" onclick="muatContoh(12,50)"
+        title="Ganti isi sesi dengan data contoh untuk melihat tampilan saat penuh — data asli disimpan otomatis dan bisa dikembalikan">Data Contoh</button>
       <button class="btn btn-ghost" onclick="sesiBaru()">Sesi Baru</button>
     </div>
 
@@ -1264,6 +1266,7 @@ body.mode-standar #panel{display:none!important}
    sebagai jaring pengaman bila browser ter-refresh saat sesi berjalan.
    ================================================================== */
 const KEY = 'forum-konsultasi-v1';
+const CADANGAN_CONTOH_KEY = 'forum-cadangan-sebelum-contoh-v1';
 
 /* ------------------------------------------------------------------
    DAFTAR WILAYAH — 38 provinsi + 416 kabupaten + 98 kota (552 entri).
@@ -1702,6 +1705,11 @@ function animCounter(el, dari, ke){
 }
 
 function renderDashboard(){
+  // "Kembali ke Data Asli" cuma muncul kalau memang ada cadangan yang bisa dipulihkan.
+  const adaCadangan = !!localStorage.getItem(CADANGAN_CONTOH_KEY);
+  document.getElementById('btnKembaliContoh').style.display = adaCadangan ? 'inline-flex' : 'none';
+  document.getElementById('btnDataContoh').style.marginLeft = adaCadangan ? '0' : 'auto';
+
   const daerah = semuaDaerah();
   const nM = masalahSelesai().length, nD = daerah.size, nT = totalTanggapan();
   animCounter(document.getElementById('stMasalah'), prevStats.m, nM);
@@ -4574,7 +4582,13 @@ document.addEventListener('keydown', e=>{
    ================================================================== */
 function muatContoh(jmlMasalah, jmlPenanggap){
   jmlMasalah = jmlMasalah || 12; jmlPenanggap = jmlPenanggap || 50;
-  if(S.masalah.length && !confirm('Data contoh akan MENGGANTI seluruh data sesi saat ini. Lanjutkan?')) return false;
+  // Data asli dicadangkan otomatis (kecuali sudah di "mode contoh" — tidak perlu
+  // menimpa cadangan yang sudah ada dengan data contoh sebelumnya) supaya tombol
+  // "Data Contoh" aman diklik kapan saja tanpa risiko kehilangan data sesi asli.
+  if(S.masalah.length && !S.contoh){
+    if(!confirm('Data sesi saat ini akan dicadangkan otomatis, lalu diganti sementara oleh data contoh.\n\nBisa dikembalikan kapan saja lewat tombol "Kembali ke Data Asli". Lanjutkan?')) return false;
+    try{ localStorage.setItem(CADANGAN_CONTOH_KEY, JSON.stringify(S)); }catch(e){}
+  }
 
   const hostTetap = ['Kota Medan','Kota Surabaya','Kabupaten Sleman','Kota Balikpapan',
     'Kota Bandung','Kabupaten Badung','Kota Makassar','Kabupaten Aceh Jaya','Kota Palembang',
@@ -4607,7 +4621,7 @@ function muatContoh(jmlMasalah, jmlPenanggap){
     if(n.indexOf('Provinsi') !== 0 && hostTetap.indexOf(n) < 0 && pool.indexOf(n) < 0) pool.push(n);
   }
 
-  S = {tanggal:new Date().toISOString().slice(0,10), mode:'PTP', aktifId:null, masalah:[]};
+  S = {tanggal:new Date().toISOString().slice(0,10), mode:'PTP', aktifId:null, masalah:[], contoh:true};
   let idx = 0;
   for(let k = 0; k < jmlMasalah; k++){
     const tg = [], jml = (k % 2 === 0) ? 4 : 5;
@@ -4626,9 +4640,24 @@ function muatContoh(jmlMasalah, jmlPenanggap){
     });
   }
   prevStats = {m:0, d:0, t:0}; chipPenuh = false;
-  simpan(); setMode('PTP'); go('dash');
+  // localStorage saja — bukan simpan() penuh, supaya data contoh TIDAK ikut
+  // menimpa berkas tersambung (Simpan Otomatis) yang seharusnya berisi data asli.
+  try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
+  setMode('PTP'); go('dash');
   toast('Data contoh dimuat: ' + jmlMasalah + ' masalah, ' + semuaDaerah().size + ' daerah.');
   return true;
+}
+
+/* Mengembalikan data sesi yang dicadangkan otomatis sebelum data contoh dimuat. */
+function kembaliDariContoh(){
+  let cad;
+  try{ cad = JSON.parse(localStorage.getItem(CADANGAN_CONTOH_KEY)); }catch(e){}
+  if(!cad || !Array.isArray(cad.masalah)){ toast('Tidak ada data asli yang dicadangkan.'); return; }
+  S = cad;
+  localStorage.removeItem(CADANGAN_CONTOH_KEY);
+  prevStats = {m:0, d:0, t:0}; chipPenuh = false;
+  simpan(); setMode('PTP'); go('dash');
+  toast('Data asli dikembalikan · ' + S.masalah.length + ' masalah.');
 }
 
 
