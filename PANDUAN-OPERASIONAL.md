@@ -16,6 +16,12 @@ Dokumen ini bisa dicetak dan ditaruh di sebelah laptop.
 > **sekali saja** — muncul ikon baru **"Update ORBIT"** di Desktop. Sesudah itu,
 > tinggal klik dua kali ikon itu kapan saja untuk menarik versi terbaru,
 > tanpa perlu buka folder ini lagi.
+>
+> **Paling praktis: tanpa keluar dari aplikasi sama sekali.** Selama aplikasi
+> terbuka di browser (lewat `ORBIT-execute.bat`), tekan **Ctrl+Shift+U**.
+> Sistem otomatis menarik versi terbaru, memasangnya, menyalakan ulang server,
+> lalu memuat ulang halaman sendiri. Jendela hitam boleh berkedip sebentar —
+> jangan ditutup sampai halaman terbuka lagi.
 
 ---
 

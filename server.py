@@ -30,6 +30,13 @@ PORT = int(os.environ.get('FORUM_PORT', 8200))   # FORUM_PORT hanya untuk uji
 AKAR = os.path.dirname(os.path.abspath(__file__))
 FOLDER_ARSIP = os.path.join(AKAR, 'arsip-liga')
 
+RILIS_ZIP_URL = 'https://github.com/ezprada-ctrl/orbit/releases/latest/download/ORBIT.zip'
+BERKAS_APLIKASI = [
+    'ORBIT-execute.bat', 'ORBIT-update.bat', 'ORBIT-buat-shortcut-update.bat',
+    'server.py', 'forum-konsultasi-antar-daerah.html', 'bid.html', 'index.html',
+    'PANDUAN-OPERASIONAL.md',
+]
+
 IZIN = {
     '/forum-konsultasi-antar-daerah.html',
     '/bid.html',
@@ -143,6 +150,67 @@ def jalankan_terowongan():
 def nama_berkas_aman(s):
     s = re.sub(r'[^\w\s-]', '', str(s or ''), flags=re.UNICODE).strip()
     return re.sub(r'\s+', '-', s).lower()[:80] or 'kelas'
+
+
+def unduh_dan_pasang_update():
+    """Tarik rilis terbaru dari GitHub lalu pasang di tempat.
+
+    Unduh + baca ZIP dulu SAMPAI SELESAI sebelum menyentuh berkas apa pun di
+    folder aplikasi — supaya koneksi putus di tengah jalan tidak pernah
+    meninggalkan sebagian berkas versi baru dan sebagian versi lama.
+    """
+    import io
+    import urllib.request
+    import zipfile
+
+    permintaan = urllib.request.Request(RILIS_ZIP_URL, headers={'User-Agent': 'ORBIT-update'})
+    try:
+        with urllib.request.urlopen(permintaan, timeout=30) as r:
+            data = r.read()
+    except Exception as e:
+        raise RuntimeError('Tidak bisa mengunduh pembaruan (periksa internet): %s' % e)
+
+    try:
+        z = zipfile.ZipFile(io.BytesIO(data))
+        nama_di_zip = set(z.namelist())
+    except Exception as e:
+        raise RuntimeError('Berkas rilis yang diunduh rusak: %s' % e)
+
+    if 'server.py' not in nama_di_zip:
+        raise RuntimeError('Paket rilis tidak lengkap (server.py tidak ada di dalamnya).')
+
+    folder_cadangan = os.path.join(AKAR, 'cadangan-sebelum-update')
+    os.makedirs(folder_cadangan, exist_ok=True)
+    for nama in BERKAS_APLIKASI:
+        asal = os.path.join(AKAR, nama)
+        if os.path.exists(asal):
+            with open(asal, 'rb') as f:
+                isi = f.read()
+            with open(os.path.join(folder_cadangan, nama), 'wb') as f:
+                f.write(isi)
+
+    for nama in BERKAS_APLIKASI:
+        if nama not in nama_di_zip:
+            continue
+        with z.open(nama) as sumber, open(os.path.join(AKAR, nama), 'wb') as tujuan:
+            tujuan.write(sumber.read())
+
+
+def mulai_ulang_server():
+    """Menyalakan proses server.py yang baru (versi yang baru saja dipasang),
+    lalu mematikan proses saat ini. Proses baru mewarisi konsol yang sama,
+    jadi tidak ada jendela hitam kedua yang muncul."""
+    import subprocess
+    time.sleep(0.5)   # beri waktu respons HTTP di atas benar-benar terkirim
+    env = dict(os.environ)
+    env['ORBIT_AUTO_RESTART'] = '1'
+    try:
+        subprocess.Popen([sys.executable, os.path.abspath(__file__)], cwd=AKAR, env=env)
+    except Exception as e:
+        print('  [!] Gagal menyalakan ulang otomatis: %s' % e)
+        print('  Tutup jendela ini lalu jalankan ORBIT-execute.bat lagi secara manual.')
+        return
+    os._exit(0)
 
 
 class ServerTunggal(ThreadingHTTPServer):
@@ -269,6 +337,15 @@ class Penangan(SimpleHTTPRequestHandler):
                 JENDELA['buka'] = False
             return self.kirim_json({'ok': True})
 
+        if jalur == '/api/update':
+            try:
+                unduh_dan_pasang_update()
+            except Exception as e:
+                return self.kirim_json({'ok': False, 'pesan': str(e)})
+            self.kirim_json({'ok': True, 'pesan': 'Update terpasang. Menyalakan ulang server...'})
+            threading.Thread(target=mulai_ulang_server, daemon=True).start()
+            return
+
         if jalur == '/api/liga/arsip':
             kelas = (data.get('kelas') or {})
             nama = nama_berkas_aman(kelas.get('nama')) + '__' + nama_berkas_aman(kelas.get('id'))
@@ -311,14 +388,28 @@ class Penangan(SimpleHTTPRequestHandler):
 
 
 def main():
-    try:
-        srv = ServerTunggal(('0.0.0.0', PORT), Penangan)
-    except OSError as e:
-        print('  [GAGAL] Port %d sudah dipakai (%s).' % (PORT, e))
-        print('  Aplikasi sudah berjalan di jendela hitam lain — pakai yang itu,')
-        print('  atau tutup jendela itu dulu lalu jalankan ORBIT-execute.bat lagi.')
-        input('  Tekan Enter untuk menutup...')
-        sys.exit(1)
+    # Restart otomatis (habis /api/update): proses lama baru saja melepas port,
+    # tapi Windows kadang butuh sesaat sebelum benar-benar bisa dipakai lagi —
+    # dicoba beberapa kali dulu sebelum menyerah. Peluncuran manual biasa (klik
+    # ORBIT-execute.bat dua kali) tetap gagal seketika seperti sebelumnya.
+    auto_restart = os.environ.get('ORBIT_AUTO_RESTART') == '1'
+    percobaan_maks = 20 if auto_restart else 1
+    srv = None
+    for percobaan in range(percobaan_maks):
+        try:
+            srv = ServerTunggal(('0.0.0.0', PORT), Penangan)
+            break
+        except OSError as e:
+            if percobaan < percobaan_maks - 1:
+                time.sleep(0.5)
+                continue
+            print('  [GAGAL] Port %d sudah dipakai (%s).' % (PORT, e))
+            print('  Aplikasi sudah berjalan di jendela hitam lain — pakai yang itu,')
+            print('  atau tutup jendela itu dulu lalu jalankan ORBIT-execute.bat lagi.')
+            input('  Tekan Enter untuk menutup...')
+            sys.exit(1)
+    if auto_restart:
+        print('  (dinyalakan ulang otomatis setelah update)')
     ips = ip_lokal()
     print('  Laptop PTP : http://localhost:%d/forum-konsultasi-antar-daerah.html' % PORT)
     if ips:

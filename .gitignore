@@ -12,3 +12,7 @@ cloudflared.exe
 
 # berkas tak dikenal, kosong
 config.yml
+
+# Cache bytecode Python & folder cadangan hasil ORBIT-update.bat / Ctrl+Shift+U
+__pycache__/
+cadangan-sebelum-update/

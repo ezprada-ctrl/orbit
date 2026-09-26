@@ -29,3 +29,10 @@ menggantikan berkas aplikasinya saja.
 Klik dua kali **`ORBIT-buat-shortcut-update.bat`** satu kali saja — ini
 membuat ikon **"Update ORBIT"** di Desktop. Sesudah itu, PTP tinggal klik dua
 kali ikon itu kapan saja untuk update, tanpa perlu buka folder ini lagi.
+
+### Paling praktis: update dari dalam aplikasi (Ctrl+Shift+U)
+
+Selama aplikasi sedang terbuka di browser (lewat `ORBIT-execute.bat`), tekan
+**Ctrl+Shift+U**. Aplikasi menarik versi terbaru, memasangnya, menyalakan
+ulang server sendiri, lalu memuat ulang halaman — tanpa perlu keluar dari
+aplikasi atau menyentuh folder sama sekali.

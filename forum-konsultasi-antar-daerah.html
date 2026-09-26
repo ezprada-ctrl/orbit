@@ -659,6 +659,23 @@ select.field{padding:13px 14px;font-size:15px;font-weight:600}
   font-weight:600;font-size:15px;box-shadow:var(--shadow);opacity:0;pointer-events:none;
   transition:all .35s var(--ease)}
 .toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ---- Update otomatis (Ctrl+Shift+U) ---- */
+.update-ov{position:fixed;inset:0;z-index:90;display:none;place-items:center;
+  background:rgba(6,14,22,.82);backdrop-filter:blur(8px);padding:40px}
+.update-ov.on{display:grid;animation:fade .3s var(--ease) both}
+.update-card{max-width:460px;width:100%;text-align:center;padding:40px 44px;
+  border-radius:var(--radius);background:var(--surface);border:1px solid var(--line);
+  box-shadow:var(--shadow)}
+.update-card .spin{width:32px;height:32px;margin:0 auto 18px;border-radius:50%;
+  border:3px solid var(--line);border-top-color:var(--accent-2);
+  animation:updSpin .8s linear infinite}
+.update-card.gagal .spin{display:none}
+@keyframes updSpin{to{transform:rotate(360deg)}}
+.update-card h3{font-size:19px;margin:0 0 8px;letter-spacing:-.01em}
+.update-card p{font-size:14.5px;line-height:1.6;color:var(--text-dim);margin:0}
+.update-card .tutup{margin-top:18px;display:none}
+.update-card.gagal .tutup{display:inline-flex}
 /* ============================================================
    LIGA INOVASI — lapisan gamifikasi di atas forum.
    Oranye khusus liga dibuat terpisah dari token tema: di luar top 3
@@ -1254,6 +1271,16 @@ body.mode-standar #panel{display:none!important}
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Update otomatis lewat Ctrl+Shift+U — lihat mulaiUpdateOtomatis() -->
+<div class="update-ov" id="updateOv">
+  <div class="update-card" id="updateCard">
+    <div class="spin"></div>
+    <h3 id="updateJudul">Memasang pembaruan…</h3>
+    <p id="updatePesan">Jangan tutup jendela hitam. Ini berjalan sebentar.</p>
+    <button class="btn btn-ghost tutup" onclick="tutupUpdateOv()">Tutup</button>
+  </div>
+</div>
 
 <script>
 /* ==================================================================
@@ -3349,6 +3376,56 @@ document.getElementById('tgIsi').addEventListener('keydown', e=>{
 document.addEventListener('keydown', e=>{
   if(e.key === 'Escape'){ tutupModal(); tutupTuntas(); }
 });
+
+// Ctrl+Shift+U = update aplikasi tanpa keluar dari layar (lihat unduh_dan_pasang_update di server.py)
+document.addEventListener('keydown', e=>{
+  if((e.ctrlKey||e.metaKey) && e.shiftKey && e.key.toLowerCase()==='u'){
+    e.preventDefault(); mulaiUpdateOtomatis();
+  }
+});
+
+function tampilkanUpdateOv(judul, pesan, gagal){
+  document.getElementById('updateJudul').textContent = judul;
+  document.getElementById('updatePesan').textContent = pesan;
+  document.getElementById('updateCard').classList.toggle('gagal', !!gagal);
+  document.getElementById('updateOv').classList.add('on');
+}
+function tutupUpdateOv(){ document.getElementById('updateOv').classList.remove('on'); }
+
+async function mulaiUpdateOtomatis(){
+  tampilkanUpdateOv('Memasang pembaruan…', 'Menghubungi server lokal — jangan tutup jendela hitam.', false);
+  let hasil;
+  try{
+    const r = await fetch('/api/update', {method:'POST', body:'{}'});
+    hasil = await r.json();
+  }catch(e){
+    tampilkanUpdateOv('Tidak bisa update',
+      'Fitur ini hanya jalan kalau aplikasi dibuka lewat ORBIT-execute.bat (bukan file:// langsung).', true);
+    return;
+  }
+  if(!hasil.ok){
+    tampilkanUpdateOv('Update gagal', hasil.pesan || 'Terjadi kesalahan tak dikenal.', true);
+    return;
+  }
+  tampilkanUpdateOv('Update terpasang', 'Menyalakan ulang server dan memuat ulang halaman…', false);
+  tungguServerSiapLaluMuatUlang();
+}
+
+function tungguServerSiapLaluMuatUlang(percobaan){
+  percobaan = percobaan || 0;
+  if(percobaan > 40){
+    tampilkanUpdateOv('Server belum menyala kembali',
+      'Tutup kotak ini, lalu muat ulang halaman manual (F5) sebentar lagi.', true);
+    return;
+  }
+  setTimeout(async ()=>{
+    try{
+      const r = await fetch('/api/info', {cache:'no-store'});
+      if(r.ok){ location.reload(); return; }
+    }catch(e){}
+    tungguServerSiapLaluMuatUlang(percobaan+1);
+  }, 1000);
+}
 
 /* Ctrl+Enter berlaku di SELURUH babak, bukan hanya kolom tanggapan.
    Operator yang sudah terbiasa menekannya di babak 2 wajar mengharapkannya
