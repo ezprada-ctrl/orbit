@@ -7,6 +7,10 @@ Dokumen ini bisa dicetak dan ditaruh di sebelah laptop.
 > **Belum punya aplikasinya?** Unduh di sini:
 > **https://github.com/ezprada-ctrl/orbit/releases/latest**
 > Klik `ORBIT.zip`, ekstrak ke folder mana saja di laptop, lalu ikuti Bagian 0 di bawah.
+>
+> **Sudah punya, tapi mau pastikan versi terbaru?** Klik dua kali
+> `ORBIT-update.bat` di folder yang sama. Data peserta dan arsip Liga Inovasi
+> tidak ikut terhapus — hanya berkas aplikasinya yang diperbarui.
 
 ---
 
