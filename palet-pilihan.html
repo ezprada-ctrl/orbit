@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="UTF-8">
+<title>Pilihan Palet</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Manrope',sans-serif;background:#0B0B0C;padding:18px;color:#fff}
+.baris{display:grid;grid-template-columns:200px 1fr;gap:0;border-radius:14px;
+  overflow:hidden;margin-bottom:14px;border:1px solid #2A2A2C}
+.kiri{padding:18px 16px;background:#141416;display:flex;flex-direction:column;justify-content:center}
+.kiri h2{font-size:17px;font-weight:800;letter-spacing:-.01em;line-height:1.2}
+.kiri .no{font-size:11px;font-weight:800;letter-spacing:.14em;color:#6E6E74;margin-bottom:6px}
+.kiri .hex{margin-top:10px;font-size:10.5px;line-height:1.7;color:#8A8A90;font-weight:600}
+.kiri .hex i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.kanan{padding:20px 22px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.tile{padding:12px 18px;border-radius:12px;border:1px solid;min-width:120px}
+.tile .n{font-size:34px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.tile .l{font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin-top:5px}
+.tbl{padding:12px 22px;border-radius:11px;font-weight:800;font-size:14px;border:none}
+.badge{padding:8px 16px;border-radius:999px;font-size:11.5px;font-weight:800;letter-spacing:.06em;border:1.5px solid}
+.pil{padding:6px 13px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.06em;
+  text-transform:uppercase;border:1px solid}
+.dots{display:flex;align-items:center;gap:7px}
+.dots span{width:15px;height:15px;border-radius:50%}
+.dots .g{width:60px;height:2px;border-radius:2px}
+</style></head><body>
+
+<div id="w"></div>
+
+<script>
+const palet = [
+ {no:'SEKARANG', nama:'Tinta & Kuningan',
+  bg:'#16150F',s:'#211E17',s2:'#2C2820',line:'#3F3A2C',t:'#F4EFE2',td:'#A29A83',
+  a:'#D9A441',oa:'#1E1A0C',a2:'#4FA382',oa2:'#07221A',w:'#8FA0D8'},
+ {no:'PILIHAN 1', nama:'Papan Tulis',
+  bg:'#191B1A',s:'#232725',s2:'#2E3330',line:'#414744',t:'#F0EEE6',td:'#9BA39D',
+  a:'#E0C368',oa:'#1D1B12',a2:'#8FBFA2',oa2:'#10231A',w:'#9FB0C9'},
+ {no:'PILIHAN 2', nama:'Nila & Kuningan',
+  bg:'#15182B',s:'#1E2239',s2:'#272C48',line:'#3A4064',t:'#EDEDF5',td:'#98A0C0',
+  a:'#DFAE4C',oa:'#1B1608',a2:'#7FC4A5',oa2:'#0C2419',w:'#8E9BD4'},
+ {no:'PILIHAN 3', nama:'Batik Nila & Soga',
+  bg:'#14131C',s:'#1E1C28',s2:'#282536',line:'#3B3750',t:'#F2EBDD',td:'#A79CA0',
+  a:'#C08043',oa:'#1A1108',a2:'#6E8FB8',oa2:'#0A1522',w:'#A99BC4'},
+ {no:'PILIHAN 4', nama:'Sepia & Biru Prusia',
+  bg:'#1A1611',s:'#252017',s2:'#312A1F',line:'#463D2D',t:'#F2E9D8',td:'#A2947B',
+  a:'#5B8FBF',oa:'#08131C',a2:'#C9A24A',oa2:'#1D1607',w:'#A08C74'},
+];
+
+document.getElementById('w').innerHTML = palet.map(p=>`
+<div class="baris">
+  <div class="kiri">
+    <div class="no">${p.no}</div>
+    <h2>${p.nama}</h2>
+    <div class="hex">
+      <i style="background:${p.bg}"></i>${p.bg} latar<br>
+      <i style="background:${p.a}"></i>${p.a} aksen<br>
+      <i style="background:${p.a2}"></i>${p.a2} mode WI<br>
+      <i style="background:${p.w}"></i>${p.w} berjalan
+    </div>
+  </div>
+  <div class="kanan" style="background:${p.bg}">
+    <div class="tile" style="background:${p.s};border-color:${p.line}">
+      <div class="n" style="color:${p.t}">12</div>
+      <div class="l" style="color:${p.td}">Masalah Dibahas</div>
+    </div>
+    <button class="tbl" style="background:${p.a};color:${p.oa}">+ Angkat Masalah</button>
+    <div class="badge" style="background:${p.a2}22;border-color:${p.a2};color:${p.a2}">MODE WIDYAISWARA</div>
+    <div class="pil" style="color:${p.w};border-color:${p.w};background:${p.w}22">Sedang Ditanggapi</div>
+    <div class="dots">
+      <span style="background:${p.a2}"></span>
+      <span class="g" style="background:${p.a};opacity:.45"></span>
+      <span style="background:${p.a}"></span>
+      <span style="background:${p.a}"></span>
+      <span class="g" style="background:${p.a};opacity:.45"></span>
+      <span style="background:${p.a2}"></span>
+    </div>
+  </div>
+</div>`).join('');
+</script>
+</body></html>

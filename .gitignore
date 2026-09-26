@@ -1,0 +1,14 @@
+# Data peserta asli dari kelas nyata — jangan pernah masuk repo publik
+arsip-liga/
+
+# Cache & output lokal graphify — bukan bagian aplikasi, gampang dibuat ulang
+graphify-out/
+
+# Berkas besar (53MB) hanya perlu untuk paket offline lokal, tidak untuk hosting web
+cloudflared.exe
+
+# Pengaturan lokal Claude Code
+.claude/
+
+# berkas tak dikenal, kosong
+config.yml
