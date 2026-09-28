@@ -40,6 +40,9 @@ Dokumen ini bisa dicetak dan ditaruh di sebelah laptop.
 11. [Pantangan](#11-pantangan)
 12. [Daftar tombol cepat](#12-daftar-tombol-cepat)
 13. [Liga Inovasi](#13-liga-inovasi)
+14. [Mode Standar](#14-mode-standar-notulen-tanpa-gamifikasi)
+15. [Layar Panggung, Pengumuman Peringkat & Peta](#15-layar-panggung-pengumuman-peringkat--peta)
+16. [Cek Siap Kelas & Penilaian Sesi](#16-cek-siap-kelas--penilaian-sesi)
 
 ---
 
@@ -78,6 +81,7 @@ di bagian atas layar. Fitur lain tetap normal — **hanya dikte** yang bermasala
 - [ ] Lalu klik **"Sesi Baru"** untuk mengosongkan. Kelas harus mulai dari nol
 - [ ] **Atur tema**: ikon matahari/bulan di pojok kanan atas. Ruangan gelap → mode gelap. Ruangan terang → mode terang
 - [ ] Colok proyektor, cek tulisan terbaca dari bangku paling belakang
+- [ ] **Terakhir: klik Cek Siap Kelas** (layar pembuka atau dashboard). Semua hijau = siap. Yang kuning/merah punya tombol perbaikan (lihat Bagian 16)
 
 ---
 
@@ -426,7 +430,8 @@ Bila liga lebih dari satu hari, tampilkan tiap akhir hari.
 - **Top 3** tampil dengan angka skor (hanya skor positif yang naik podium). Penentu seri: skor → jumlah bid → paling sering terpilih.
   Yang **seri penuh** (ketiganya sama) naik podium bersama — tidak ada yang tersingkir karena urutan abjad
 - Sisanya tampil **nama saja**, tanpa angka, disorot oranye — makin ke bawah makin terang
-- Akhir sesi terakhir: klik **Umumkan Peringkat Akhir** → peringkat 1 diberi keterangan *Penerima sertifikat*
+- Akhir sesi terakhir: klik **Umumkan Peringkat Akhir** → pengumuman dibuka bertahap (lihat Bagian 15) →
+  peringkat 1 diberi keterangan *Penerima sertifikat*. Mau diulang? **Putar ulang pengumuman**
 - **Tabel skor lengkap (khusus PTP)** memuat angka minus — **jangan dibuka saat proyektor menyala**
 
 ### Data liga & sertifikat
@@ -469,3 +474,107 @@ Untuk rapat, pelatihan lain, atau forum yang tidak memakai game.
 - **Ekspor:** tombol *Unduh PDF* / *Unduh Word* (sampul → daftar peserta → transkrip bernomor).
 - **Knowledge base:** tab *Cari & Arsip* menelusuri seluruh sesi (isi, pembicara, unit, judul). Klik hasil untuk lompat ke catatannya.
 - **Cadangan:** data Mode Standar hanya di browser laptop itu — rutin klik *Simpan cadangan (JSON)* ke OneDrive; *Muat cadangan* menggabungkan arsip di laptop lain.
+
+## 15. Layar Panggung, Pengumuman Peringkat & Peta
+
+### Layar Panggung: proyektor punya tampilannya sendiri
+
+Laptop tetap dipakai PTP untuk mengetik. Proyektor menampilkan versi yang bersih dan besar,
+yang **berganti sendiri mengikuti alur kelas**. PTP tidak perlu mengatur apa pun.
+
+**Cara menyalakan (sekali di awal kelas):**
+
+1. Klik ikon **layar kecil** di kanan atas (sebelah roda gigi). Jendela *Layar Panggung* terbuka.
+2. Tekan **Windows + P** → pilih **Perluas** (*Extend*).
+3. Seret jendela *Layar Panggung* ke layar proyektor, lalu **klik sekali** di jendela itu (otomatis layar penuh).
+
+Titik hijau di ikon layar = proyektor sedang tersambung.
+
+**Yang tampil di proyektor, otomatis:**
+
+| Saat PTP… | Proyektor menampilkan |
+|---|---|
+| di dashboard | Peta Indonesia: daerah yang saling berbagi praktik + angka sesi |
+| mencatat masalah & tanggapan | Judul masalah, tanggapan yang masuk, peta kecil yang menyorot daerah pemilik masalah |
+| membuka jendela bid | QR besar, jumlah bid yang terus bertambah, kartu nama bidder, **hitung mundur** |
+| presentasi jawaban | Bidder yang sedang **Giliran bicara** disorot besar |
+| menetapkan pemenang | Jawaban terpilih dengan **+3** dan konfeti. Bidder lain disebut dengan ucapan terima kasih, **tanpa angka minus** |
+| mengalihkan ke WI | Layar hijau "Giliran Widyaiswara" |
+| WI selesai menyimpulkan | Teks kesimpulan tampil besar (sekitar 2 menit) |
+| membuka Papan Peringkat | Papan peringkat (muat satu layar walau pesertanya 50) |
+| Tutup Sesi | Rangkuman sesi + peta yang tergambar ulang dari awal |
+
+**Hitung mundur bid:** di kartu *Jendela Bid Terbuka* pilih **1 / 2 / 3 / 5 menit**. Waktunya berjalan
+besar di proyektor dan kecil di laptop. Saat waktu habis, jendela **tidak** tertutup sendiri; PTP tetap
+yang menekan *Tutup Jendela Bid*.
+
+**Mau menampilkan hal lain?** Klik lagi ikon layar → pilih **Otomatis**, **Peta Jejaring**,
+**Papan Peringkat**, atau **Layar Jeda** (logo ORBIT, untuk sebelum mulai atau istirahat).
+
+> Layar Panggung hanya **menampilkan**. Ia tidak pernah mengubah data. Ditutup kapan pun, tidak ada yang hilang.
+> Tanpa proyektor kedua pun aplikasi tetap berjalan seperti biasa.
+
+### Pengumuman Peringkat Akhir yang dibuka bertahap
+
+Liga Inovasi → Papan Peringkat → **Umumkan Peringkat Akhir**. Urutannya:
+
+1. **Pembuka**: judul besar "Peringkat Akhir" + ringkasan liga. Saatnya WI/PTP memberi pengantar.
+2. **Peringkat 3** → **Peringkat 2**: kartu "?" dibuka satu per satu, skor dihitung naik.
+3. **Peringkat 1**: kartu bergetar, hitung mundur **3-2-1**, lalu nama dibuka + konfeti.
+4. **Papan lengkap**.
+
+Maju ke tahap berikutnya: tombol **Lanjut**, **Spasi**, **panah kanan**, atau **clicker presentasi**.
+Mundur: panah kiri. Keluar: **Esc**.
+
+- Layar Panggung terbuka → pengumuman tampil di proyektor, laptop menampilkan panel kendali.
+- Tidak ada Layar Panggung → pengumuman tampil layar penuh di laptop itu sendiri.
+- Seri penuh di satu peringkat → namanya dibuka bersama dalam satu kartu. Di peringkat 1 tertulis *Seri — penentuan panitia*.
+
+### Peta Indonesia
+
+Di dashboard (bagian *Jaring Forum*) dan di layar penutupan ada pilihan **Jaring | Peta Indonesia**.
+
+- **Titik hijau** = daerah pengangkat masalah. **Titik biru** = daerah penanggap.
+- **Garis lengkung dengan titik yang bergerak** = praktik yang mengalir dari penanggap ke pemilik masalah.
+- Klik titik hijau untuk menyorot siapa saja yang menanggapi daerah itu.
+- Peta bekerja **tanpa internet**. Daerah yang namanya diketik tidak resmi (bukan dari daftar saran) tidak
+  muncul di peta; aplikasi menyebutkan namanya di bawah peta supaya bisa dibetulkan.
+
+## 16. Cek Siap Kelas & Penilaian Sesi
+
+### Cek Siap Kelas
+
+Tombol **Cek Siap Kelas** ada di layar pembuka dan di dashboard. Sekali klik, aplikasi memeriksa:
+
+- dibuka lewat `ORBIT-execute.bat` atau tidak
+- internet laptop
+- HP peserta bisa masuk atau tidak. Ada **QR uji**: pindai dengan HP sendiri; muncul tulisan *"Jendela bid sedang tertutup"* = berhasil
+- mikrofon untuk dikte (tombol **Uji mikrofon** supaya izin tidak ditanyakan di depan kelas)
+- sisa data kelas sebelumnya, data contoh yang lupa dikembalikan
+- daftar peserta Liga, nama kelas, nama daerah yang tidak dikenali
+- Simpan Otomatis dan Layar Panggung
+
+**Hijau** = beres. **Kuning** = catatan / opsional. **Merah** = bereskan sebelum mulai. Tiap yang belum hijau diberi tombol perbaikan.
+Klik **Periksa ulang** setelah memperbaiki.
+
+### Penilaian Sesi (skala 1–5 dari HP)
+
+Satu pertanyaan: *"Seberapa bermanfaat sesi forum hari ini bagi pekerjaan Anda?"*. Peserta menggeser penilaian
+dari **1 (tidak bermanfaat)** sampai **5 (sangat bermanfaat)**, boleh menambah satu kalimat komentar.
+
+- **Muncul sendiri** di HP peserta begitu WI menyimpulkan masalah pertama. Tampil di halaman yang sama dengan bid
+  (QR yang sama), hanya saat jendela bid sedang tertutup.
+- **Sekali per orang per sesi.** Setelah mengirim, di HP itu tidak muncul lagi. Nama yang sudah menilai juga
+  ditolak bila dicoba lewat HP lain.
+- **Peserta yang tidak pernah bid** tetap bisa menilai lewat QR yang sama. Waktu terbaik menagihnya: saat PTP menekan
+  **Umumkan Peringkat Akhir**. Bila masih ada yang belum menilai, aplikasi menahan dulu dan menawarkan
+  **Tampilkan QR penilaian**. Proyektor lalu menampilkan QR besar + titik-titik yang berubah hijau satu per satu
+  (tanpa nama, tanpa nilai). Setelah cukup, tekan **Umumkan sekarang**.
+- Daftar nama yang **belum menilai** bisa dilihat PTP (khusus laptop, untuk diingatkan langsung).
+- **Unduh Penilaian (Excel)**: di layar Penutupan Sesi atau Liga Inovasi → Arsip & Ekspor. Isinya:
+  **Nama | Pemda | Penilaian (1–5)** + keterangan, komentar, tanggal, jam; ringkasan rata-rata dan sebaran nilai; daftar yang belum menilai.
+  Penilaian juga ikut masuk ke Excel kelas utama (lembar *Penilaian Sesi*).
+- Nilai perorangan **tidak pernah** tampil di proyektor. Di layar Penutupan Sesi hanya jumlah yang sudah menilai;
+  rata-rata hanya ada di tab Arsip & Ekspor dan Excel.
+- Penilaian butuh daftar peserta Liga Inovasi dan aplikasi yang dibuka lewat `ORBIT-execute.bat`.
+

@@ -45,6 +45,9 @@ IZIN = {
 
 KUNCI = threading.Lock()
 JENDELA = {'buka': False}   # {buka, masalahId, judul, daerah, pemilik, peserta[], bids[], seq}
+# Penilaian sesi (skala 1-5) dari HP. Satu peserta satu penilaian per tanggal;
+# laptop PTP menarik 'masuk' lalu menyimpannya di data liga (sumber kebenaran).
+NILAI = {'buka': False}     # {buka, tanggal, peserta[], sudah:set(id), masuk[]}
 
 
 def ip_lokal():
@@ -250,7 +253,7 @@ class Penangan(SimpleHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
         # log ringkas: sembunyikan polling rutin supaya jendela hitam tetap terbaca
-        if any(k in self.path for k in ('/api/liga/status', '/api/liga/bids', '/api/info')):
+        if any(k in self.path for k in ('/api/liga/status', '/api/liga/bids', '/api/liga/nilai', '/api/info')):
             return
         sys.stderr.write('  %s  %s\n' % (self.client_address[0], fmt % args))
 
@@ -265,17 +268,29 @@ class Penangan(SimpleHTTPRequestHandler):
 
         if jalur == '/api/info':
             return self.kirim_json({'ok': True, 'port': PORT, 'ip': ip_lokal(),
-                                    'publik': TEROWONGAN['url']})
+                                    'publik': TEROWONGAN['url'],
+                                    'terowongan': TEROWONGAN['proses'] is not None})
 
         if jalur == '/api/liga/status':
             with KUNCI:
                 j = JENDELA
+                nilai = None
+                if NILAI.get('buka'):
+                    nilai = {'buka': True, 'tanggal': NILAI['tanggal'], 'peserta': NILAI['peserta'],
+                             'sudah': sorted(NILAI['sudah'])}
                 if not j.get('buka'):
-                    return self.kirim_json({'buka': False})
+                    return self.kirim_json({'buka': False, 'nilai': nilai})
                 return self.kirim_json({
                     'buka': True, 'masalahId': j['masalahId'], 'judul': j['judul'],
-                    'daerah': j['daerah'], 'peserta': j['peserta'],
+                    'daerah': j['daerah'], 'peserta': j['peserta'], 'nilai': nilai,
                 })
+
+        if jalur == '/api/liga/nilai':
+            if not self.dari_laptop():
+                return self.kirim_json({'ok': False, 'pesan': 'Tidak diizinkan.'}, 403)
+            with KUNCI:
+                return self.kirim_json({'buka': NILAI.get('buka', False), 'tanggal': NILAI.get('tanggal'),
+                                        'masuk': NILAI.get('masuk', [])})
 
         if jalur == '/api/liga/bids':
             if not self.dari_laptop():
@@ -307,6 +322,8 @@ class Penangan(SimpleHTTPRequestHandler):
 
         if jalur == '/api/liga/bid':
             return self.terima_bid(data)
+        if jalur == '/api/liga/nilai':
+            return self.terima_nilai(data)
 
         # semua aksi di bawah ini hanya dari laptop PTP
         if not self.dari_laptop():
@@ -335,6 +352,27 @@ class Penangan(SimpleHTTPRequestHandler):
             with KUNCI:
                 JENDELA.clear()
                 JENDELA['buka'] = False
+            return self.kirim_json({'ok': True})
+
+        if jalur == '/api/liga/nilai-buka':
+            with KUNCI:
+                tgl = str(data.get('tanggal') or '')
+                lama = NILAI.get('masuk', []) if NILAI.get('tanggal') == tgl else []
+                NILAI.clear()
+                NILAI.update({
+                    'buka': True, 'tanggal': tgl,
+                    'peserta': [{'id': str(p.get('id')), 'nama': str(p.get('nama')),
+                                 'daerah': str(p.get('daerah') or '')}
+                                for p in (data.get('peserta') or [])],
+                    'sudah': set(str(x) for x in (data.get('sudah') or [])) | {m['pesertaId'] for m in lama},
+                    'masuk': lama,
+                })
+            return self.kirim_json({'ok': True})
+
+        if jalur == '/api/liga/nilai-tutup':
+            with KUNCI:
+                NILAI.clear()
+                NILAI['buka'] = False
             return self.kirim_json({'ok': True})
 
         if jalur == '/api/update':
@@ -385,6 +423,30 @@ class Penangan(SimpleHTTPRequestHandler):
             j['bids'].append({'id': 'hp%d-%s' % (j['seq'], j['masalahId']), 'pesertaId': pid,
                               'keypoint': kp, 'waktu': time.strftime('%Y-%m-%dT%H:%M:%S'), 'rev': 0})
         return self.kirim_json({'ok': True, 'diperbarui': False})
+
+    def terima_nilai(self, data):
+        with KUNCI:
+            n = NILAI
+            if not n.get('buka'):
+                return self.kirim_json({'ok': False, 'pesan': 'Penilaian sesi sedang ditutup.'}, 409)
+            if str(data.get('tanggal') or '') != n['tanggal']:
+                return self.kirim_json({'ok': False, 'pesan': 'Sesi sudah berganti. Muat ulang halaman.'}, 409)
+            pid = str(data.get('pesertaId') or '')
+            if not any(p['id'] == pid for p in n['peserta']):
+                return self.kirim_json({'ok': False, 'pesan': 'Nama tidak ada di daftar peserta.'}, 400)
+            if pid in n['sudah']:
+                return self.kirim_json({'ok': False, 'sudah': True, 'pesan': 'Nama ini sudah memberi penilaian untuk sesi ini.'}, 409)
+            try:
+                nilai = int(data.get('nilai'))
+            except (TypeError, ValueError):
+                nilai = 0
+            if nilai < 1 or nilai > 5:
+                return self.kirim_json({'ok': False, 'pesan': 'Geser dulu untuk memilih nilai 1 sampai 5.'}, 400)
+            n['sudah'].add(pid)
+            n['masuk'].append({'pesertaId': pid, 'nilai': nilai,
+                               'komentar': str(data.get('komentar') or '').strip()[:500],
+                               'waktu': time.strftime('%Y-%m-%dT%H:%M:%S')})
+        return self.kirim_json({'ok': True})
 
 
 def main():

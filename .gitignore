@@ -6,6 +6,7 @@ graphify-out/
 
 # Berkas besar (53MB) hanya perlu untuk paket offline lokal, tidak untuk hosting web
 cloudflared.exe
+cloudflared.zip
 
 # Pengaturan lokal Claude Code
 .claude/

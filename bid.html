@@ -58,12 +58,30 @@ button:disabled{opacity:.5}
 .ok{color:var(--accent-2)}.err{color:var(--danger)}
 .tutup{text-align:center;padding:40px 18px;color:var(--text-dim);font-size:16px;line-height:1.6}
 .tutup b{display:block;color:var(--text);font-size:19px;margin-bottom:6px}
+/* penilaian sesi: satu penggeser 1-5 */
+.skala{margin-top:10px;padding:18px 16px 14px;border-radius:14px;background:var(--surface);border:1.5px solid var(--line)}
+.skala.dipilih{border-color:var(--accent)}
+.angka{text-align:center;font-size:54px;font-weight:800;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
+.skala:not(.dipilih) .angka{color:var(--line)}
+.arti{text-align:center;font-size:16px;font-weight:700;margin:8px 0 14px;min-height:22px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:36px;padding:0;border:none;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:10px;border-radius:999px;background:linear-gradient(90deg,var(--line),var(--accent))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:34px;height:34px;margin-top:-12px;border-radius:50%;
+  background:var(--accent);border:4px solid var(--surface);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+input[type=range]::-moz-range-track{height:10px;border-radius:999px;background:linear-gradient(90deg,var(--line),var(--accent))}
+input[type=range]::-moz-range-thumb{width:28px;height:28px;border-radius:50%;background:var(--accent);border:4px solid var(--surface)}
+.tik{display:flex;justify-content:space-between;font-size:13px;font-weight:800;color:var(--text-dim);padding:0 8px}
+.terima{text-align:center;padding:34px 18px}
+.terima .c{width:74px;height:74px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;
+  background:var(--accent-2);color:var(--surface);font-size:40px;font-weight:800}
+.terima b{display:block;font-size:20px;margin-bottom:6px}
+.terima span{color:var(--text-dim);font-size:15px;line-height:1.6}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="kick">Liga Inovasi</div>
-  <h1>Bid Jawaban</h1>
+  <h1 id="judulHal">Bid Jawaban</h1>
   <div id="isi"><div class="tutup">Menghubungkan ke laptop PTP…</div></div>
 </div>
 <script>
@@ -71,24 +89,52 @@ button:disabled{opacity:.5}
    masalah. Nama dipilih dari daftar peserta (bukan diketik) supaya poin tidak
    terpecah ke beberapa ejaan nama yang berbeda. */
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let status = null, terkirim = false;
+let status = null, terkirim = false, tampilan = '';
 const INGAT = 'liga-bid-nama';
+const ARTI = ['', 'Tidak bermanfaat', 'Kurang bermanfaat', 'Cukup bermanfaat', 'Bermanfaat', 'Sangat bermanfaat'];
+const baca = k => { try{ return localStorage.getItem(k) || ''; }catch(e){ return ''; } };
+
+/* Penilaian sesi muncul SEKALI per orang per sesi: disembunyikan bila HP ini
+   sudah mengirim untuk tanggal itu, atau nama yang diingat HP ini sudah
+   tercatat menilai (mis. lewat HP lain). Jendela bid selalu didahulukan. */
+function perluNilai(){
+  const n = status && status.nilai;
+  if(!n || !n.buka) return false;
+  if(baca('liga-nilai-' + n.tanggal)) return false;
+  const ingat = baca(INGAT);
+  return !(ingat && n.sudah.includes(ingat));
+}
+function kunciTampilan(){
+  if(!status) return 'putus';
+  if(status.buka) return 'bid:' + status.masalahId;
+  if(perluNilai()) return 'nilai:' + status.nilai.tanggal;
+  if(status.nilai && status.nilai.buka) return 'terima';
+  return 'tutup';
+}
 
 async function periksa(){
   let st;
   try{ st = await (await fetch('/api/liga/status', {cache:'no-store'})).json(); }
   catch(e){ st = null; }
-  const sama = status && st && st.buka && status.buka && st.masalahId === status.masalahId;
   status = st;
-  if(sama) return;              // formulir tidak dibangun ulang saat peserta sedang mengetik
+  const k = kunciTampilan();
+  if(k === tampilan) return;    // formulir tidak dibangun ulang saat peserta sedang mengisi
+  tampilan = k;
   terkirim = false;
   gambar();
 }
 
 function gambar(){
   const el = document.getElementById('isi');
+  const nilaiMode = tampilan.startsWith('nilai') || tampilan === 'terima';
+  document.getElementById('judulHal').textContent = nilaiMode ? 'Penilaian Sesi' : 'Bid Jawaban';
   if(!status){
     el.innerHTML = '<div class="tutup"><b>Laptop PTP tidak terjangkau</b>Periksa koneksi internet HP, lalu muat ulang halaman ini. Bila tetap gagal, sampaikan bid Anda langsung ke PTP.</div>';
+    return;
+  }
+  if(tampilan.startsWith('nilai')) return gambarNilai(el);
+  if(tampilan === 'terima'){
+    el.innerHTML = '<div class="terima"><div class="c">✓</div><b>Terima kasih!</b><span>Penilaian Anda untuk sesi ini sudah tercatat.<br>Halaman ini aktif kembali sendiri begitu PTP membuka bid berikutnya.</span></div>';
     return;
   }
   if(!status.buka){
@@ -110,7 +156,64 @@ function gambar(){
     <textarea id="kp" placeholder="Ringkasan poin-poin jawaban Anda — cukup yang mewakili isi jawaban secara utuh."></textarea>
     <button id="kirim" onclick="kirim()">Kirim Bid</button>
     <div class="msg" id="msg"></div>`;
-  pasangCari();
+  pasangCari(status.peserta, 'kp');
+}
+
+function gambarNilai(el){
+  el.innerHTML = `
+    <div class="card"><div class="judul">Seberapa bermanfaat sesi forum hari ini bagi pekerjaan Anda?</div>
+      <div class="hint">Satu kali saja per sesi — kurang dari 30 detik.</div></div>
+    <label for="nama">Nama Anda</label>
+    <div class="cari">
+      <input id="nama" autocomplete="off" placeholder="Ketik nama Anda atau daerah…">
+      <div class="saran" id="saran" hidden></div>
+    </div>
+    <label for="skala">Geser dari kiri ke kanan</label>
+    <div class="skala" id="kotakSkala">
+      <div class="angka" id="angka">–</div>
+      <div class="arti" id="arti">Geser untuk memilih nilai</div>
+      <input type="range" id="skala" min="1" max="5" step="1" value="3">
+      <div class="tik"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
+    </div>
+    <label for="kom">Satu hal yang akan Anda terapkan di daerah (boleh dikosongkan)</label>
+    <textarea id="kom" style="min-height:80px" maxlength="500"></textarea>
+    <button id="kirim" onclick="kirimNilai()" disabled>Kirim Penilaian</button>
+    <div class="msg" id="msg"></div>`;
+  const r = document.getElementById('skala');
+  // nilai baru sah setelah penggeser benar-benar disentuh — bukan angka tengah bawaan
+  const ubah = ()=>{
+    r.dataset.dipilih = '1';
+    document.getElementById('kotakSkala').classList.add('dipilih');
+    document.getElementById('angka').textContent = r.value;
+    document.getElementById('arti').textContent = ARTI[r.value];
+    document.getElementById('kirim').disabled = false;
+  };
+  r.addEventListener('input', ubah);
+  r.addEventListener('change', ubah);
+  pasangCari(status.nilai.peserta, 'skala');
+}
+
+async function kirimNilai(){
+  const nama = document.getElementById('nama').dataset.id;
+  const r = document.getElementById('skala');
+  const msg = document.getElementById('msg');
+  if(!nama){ msg.className='msg err'; msg.textContent='Ketik lalu pilih nama Anda dari saran yang muncul.'; return; }
+  if(!r.dataset.dipilih){ msg.className='msg err'; msg.textContent='Geser dulu untuk memilih nilai 1 sampai 5.'; return; }
+  if(status.nilai.sudah.includes(nama)){ msg.className='msg err'; msg.textContent='Nama ini sudah memberi penilaian untuk sesi ini. Terima kasih!'; return; }
+  const tgl = status.nilai.tanggal;
+  const b = document.getElementById('kirim'); b.disabled = true;
+  try{
+    const res = await fetch('/api/liga/nilai', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pesertaId:nama, nilai:+r.value, komentar:document.getElementById('kom').value.trim(), tanggal:tgl})});
+    const j = await res.json();
+    if(j.ok){
+      try{ localStorage.setItem(INGAT, nama); localStorage.setItem('liga-nilai-' + tgl, nama); }catch(e){}
+      tampilan = 'terima'; gambar();
+      return;
+    }
+    msg.className='msg err'; msg.textContent = j.pesan || 'Penilaian ditolak.';
+  }catch(e){ msg.className='msg err'; msg.textContent='Gagal terhubung ke laptop PTP. Coba lagi sebentar.'; }
+  b.disabled = false;
 }
 
 /* Kolom cari nama: saran muncul sejak 1 huruf (nama atau daerah). Nama baru
@@ -121,20 +224,19 @@ function tandaiCocok(t, q){
   if(!q || i < 0) return esc(t);
   return esc(t.slice(0,i)) + '<mark>' + esc(t.slice(i,i+q.length)) + '</mark>' + esc(t.slice(i+q.length));
 }
-function pasangCari(){
+function pasangCari(daftar, fokusId){
   const inp = document.getElementById('nama'), box = document.getElementById('saran');
   let hasil = [], aktif = -1;
-  const pilih = p => { inp.dataset.id = p.id; inp.value = p.nama + ' — ' + p.daerah; box.hidden = true; document.getElementById('kp').focus(); };
-  let ingat = '';
-  try{ ingat = localStorage.getItem(INGAT) || ''; }catch(e){}
-  const pi = status.peserta.find(p => p.id === ingat);
+  const pilih = p => { inp.dataset.id = p.id; inp.value = p.nama + ' — ' + p.daerah; box.hidden = true; const f = document.getElementById(fokusId); if(f && f.type !== 'range') f.focus(); };
+  const ingat = baca(INGAT);
+  const pi = daftar.find(p => p.id === ingat);
   if(pi){ inp.dataset.id = pi.id; inp.value = pi.nama + ' — ' + pi.daerah; }
   function tampil(){
     const q = norm(inp.value);
     if(!q){ box.hidden = true; return; }
     const skor = p => { const n = norm(p.nama), d = norm(p.daerah);
       return n.startsWith(q) ? 0 : n.split(' ').some(k=>k.startsWith(q)) ? 1 : n.includes(q) ? 2 : d.includes(q) ? 3 : 9; };
-    hasil = status.peserta.map(p=>[skor(p),p]).filter(x=>x[0]<9)
+    hasil = daftar.map(p=>[skor(p),p]).filter(x=>x[0]<9)
       .sort((a,b)=>a[0]-b[0]||a[1].nama.localeCompare(b[1].nama,'id')).map(x=>x[1]);
     aktif = hasil.length ? 0 : -1;
     box.innerHTML = hasil.length ? hasil.map((p,i)=>`<div class="opsi${i===aktif?' act':''}" data-i="${i}"><b>${tandaiCocok(p.nama,q)}</b><span>${tandaiCocok(p.daerah,q)}</span></div>`).join('')
