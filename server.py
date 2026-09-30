@@ -199,6 +199,64 @@ def unduh_dan_pasang_update():
             tujuan.write(sumber.read())
 
 
+TANDA_VERSI = os.path.join(AKAR, '.versi-terpasang')   # dicatat lokal saja — tidak ikut ke-zip, tidak ikut git
+
+
+def cek_dan_pasang_update_otomatis():
+    """Dipanggil ORBIT-execute.bat lewat `server.py --auto-update` SEBELUM
+    aplikasi dibuka, supaya PTP selalu pakai versi terbaru tanpa perlu ingat
+    pencet Ctrl+Shift+U atau buka ORBIT-update.bat manual tiap ada rilis baru.
+
+    Cuma HEAD request kecil (bandingkan ETag rilis dengan tanda lokal) — zip
+    53MB baru diunduh kalau memang ada versi baru. Gagal/offline dilewati
+    diam-diam: sesi harus tetap bisa dibuka tanpa internet.
+
+    Belum ada tanda lokal (pertama kali fitur ini jalan) -> JANGAN langsung
+    unduh. Berkas yang sedang aktif sudah didapat lewat jalur update biasa,
+    jadi dianggap sudah yang terbaru saat itu; cukup catat tandanya sebagai
+    titik awal. Tanpa ini, tiap perubahan lokal yang belum sempat dirilis
+    (mis. sedang dikembangkan) akan langsung tertimpa balik ke rilis lama
+    pada percobaan pertama."""
+    import urllib.request
+    try:
+        req = urllib.request.Request(RILIS_ZIP_URL, headers={'User-Agent': 'ORBIT-update'}, method='HEAD')
+        with urllib.request.urlopen(req, timeout=5) as r:
+            etag = r.headers.get('ETag') or r.headers.get('Last-Modified')
+    except Exception:
+        print('  (lewati cek pembaruan — tidak ada internet)')
+        return
+    if not etag:
+        return
+    if not os.path.exists(TANDA_VERSI):
+        try:
+            with open(TANDA_VERSI, 'w', encoding='utf-8') as f:
+                f.write(etag)
+        except OSError:
+            pass
+        return
+    try:
+        with open(TANDA_VERSI, encoding='utf-8') as f:
+            lama = f.read().strip()
+    except OSError:
+        lama = None
+    if etag == lama:
+        print('  Sudah versi terbaru.')
+        return
+    print('  Versi baru ditemukan — memasang...')
+    try:
+        unduh_dan_pasang_update()
+    except Exception as e:
+        print('  [!] Gagal memasang pembaruan otomatis: %s' % e)
+        print('  Aplikasi tetap dibuka dengan versi yang ada.')
+        return
+    try:
+        with open(TANDA_VERSI, 'w', encoding='utf-8') as f:
+            f.write(etag)
+    except OSError:
+        pass
+    print('  Selesai — aplikasi dibuka dengan versi terbaru.')
+
+
 def mulai_ulang_server():
     """Menyalakan proses server.py yang baru (versi yang baru saja dipasang),
     lalu mematikan proses saat ini. Proses baru mewarisi konsol yang sama,
@@ -494,4 +552,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == '--auto-update':
+        cek_dan_pasang_update_otomatis()   # cek + pasang lalu keluar; tidak menyalakan server
+    else:
+        main()

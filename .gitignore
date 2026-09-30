@@ -17,3 +17,7 @@ config.yml
 # Cache bytecode Python & folder cadangan hasil ORBIT-update.bat / Ctrl+Shift+U
 __pycache__/
 cadangan-sebelum-update/
+
+# Tanda versi rilis yang lagi terpasang — dicek ORBIT-execute.bat tiap dibuka
+# (server.py --auto-update) untuk tahu perlu unduh ulang atau tidak
+.versi-terpasang

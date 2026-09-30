@@ -846,9 +846,12 @@ body.mode-standar #panel{display:none!important}
 .pt-denyut.pt-sorot{stroke:var(--liga)}
 @keyframes ptDenyut{0%{transform:scale(1);opacity:.8}100%{transform:scale(3.2);opacity:0}}
 .pt-label{fill:var(--text);font-size:11px;font-weight:700;font-family:var(--font);
-  paint-order:stroke;stroke:var(--bg);stroke-width:3.5px;stroke-linejoin:round;animation:fade .6s var(--ease) both}
+  paint-order:stroke;stroke:var(--bg);stroke-width:3.5px;stroke-linejoin:round;animation:fade .6s var(--ease) both;
+  pointer-events:none}
 .pt-label.pt-sorot{fill:var(--liga);font-size:13px}
 .peta.besar .pt-label{font-size:12.5px}
+.pt-tunjuk{stroke:var(--text-dim);stroke-width:.8;stroke-dasharray:1.5 1.5;opacity:.6;pointer-events:none;
+  animation:fade .6s var(--ease) both}
 .pt-nota{font-size:13px;color:var(--text-dim);margin-top:10px;line-height:1.5}
 .seg-mini{display:inline-flex;padding:3px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line)}
 .seg-mini button{border:none;background:transparent;color:var(--text-dim);font:inherit;font-size:13px;font-weight:600;
@@ -3907,11 +3910,22 @@ async function api(jalur, data){
   return r.json();
 }
 /* Alamat internet (terowongan cloudflared) didahulukan: HP bisa masuk dari
-   jaringan apa pun. IP lokal hanya cadangan bila internet laptop mati. */
+   jaringan apa pun. IP lokal hanya cadangan bila internet laptop mati.
+   Laptop kantor sering punya VPN yang membuat tebakan IP pertama salah
+   (mis. 10.x VPN padahal HP nyambung ke WiFi 192.168.x) — makanya PTP bisa
+   memilih alamat lain lewat gantiAlamatBid() bila QR yang tampil tidak jalan. */
+let ligaIpIdx = 0;
 function urlBid(){
   if(ligaServer && ligaServer.publik) return ligaServer.publik + '/bid';
   if(!ligaServer || !ligaServer.ip || !ligaServer.ip.length) return null;
-  return 'http://' + ligaServer.ip[0] + ':' + (ligaServer.port || location.port || 8200) + '/bid';
+  const ip = ligaServer.ip[ligaIpIdx % ligaServer.ip.length];
+  return 'http://' + ip + ':' + (ligaServer.port || location.port || 8200) + '/bid';
+}
+function gantiAlamatBid(){
+  if(!ligaServer || !ligaServer.ip || ligaServer.ip.length < 2) return;
+  ligaIpIdx = (ligaIpIdx + 1) % ligaServer.ip.length;
+  renderLigaTg();
+  if($id('lgQrBesar')) qrBesar();
 }
 
 /* --- arsip otomatis ke disk --- */
@@ -4551,7 +4565,10 @@ function renderLigaTg(){
           <div class="lg-qr" id="lgQr">${url ? 'Memuat QR…' : 'Bid lewat HP tidak tersedia'}</div>
           ${url
             ? `<div class="lg-url">${esc(url)}<small>${ligaServer && ligaServer.publik ? 'Pindai QR — HP cukup tersambung ke internet (WiFi apa pun atau data seluler).' : 'Alamat internet belum siap — sementara HP harus di WiFi yang sama dengan laptop.'}</small></div>
-               <button class="btn btn-ghost" style="margin-top:10px;padding:8px 14px;font-size:13.5px" onclick="qrBesar()">Tampilkan QR besar</button>`
+               <button class="btn btn-ghost" style="margin-top:10px;padding:8px 14px;font-size:13.5px" onclick="qrBesar()">Tampilkan QR besar</button>
+               ${!ligaServer.publik && ligaServer.ip && ligaServer.ip.length > 1
+                 ? `<div style="margin-top:8px"><a href="#" style="font-size:13px;color:var(--liga)" onclick="event.preventDefault();gantiAlamatBid()">QR tidak kebaca di HP? Coba alamat lain (${ligaIpIdx + 1}/${ligaServer.ip.length})</a></div>`
+                 : ''}`
             : `<p class="lg-sub" style="margin-top:10px">${ligaServer ? 'Laptop belum tersambung ke WiFi.' : 'Aplikasi tidak dibuka lewat <b>ORBIT-execute.bat</b>.'} Catat bid secara manual di sebelah — sesi tetap jalan.</p>`}
         </div>
         <div>
@@ -4699,6 +4716,9 @@ function qrBesar(){
       <h2 style="font-size:28px;letter-spacing:-.02em;margin:8px 0 18px">${p ? esc(p.judul) : ''}</h2>
       <div class="lg-qr" id="lgQrBesar" style="display:inline-flex;padding:20px"></div>
       <div class="lg-url" style="font-size:22px;margin-top:16px">${esc(url)}</div>
+      ${ligaServer && !ligaServer.publik && ligaServer.ip && ligaServer.ip.length > 1
+        ? `<div style="margin-top:6px"><a href="#" style="font-size:14px;color:var(--liga)" onclick="event.preventDefault();gantiAlamatBid()">QR tidak kebaca di HP? Coba alamat lain (${ligaIpIdx + 1}/${ligaServer.ip.length})</a></div>`
+        : ''}
       <p class="lg-sub" style="margin-top:8px">${ligaServer && ligaServer.publik ? 'Cukup tersambung ke internet — WiFi apa pun atau data seluler.' : 'HP harus tersambung ke WiFi yang sama dengan laptop PTP.'}</p>
       <button class="btn btn-ghost" style="margin-top:18px" onclick="tutupModal()">Tutup</button>
     </div>`;
@@ -5450,6 +5470,7 @@ function renderPesertaStd(){
         ${lain.length ? `<select class="field" id="stdSalinDari" style="max-width:340px">${lain.map(x =>
           `<option value="${x.id}">${esc(tanggalPendek(x.tanggal) + ' · ' + judulSesiStd(x) + ' (' + x.peserta.length + ' org)')}</option>`).join('')}</select>
           <button class="btn btn-ghost" onclick="stdSalinPeserta()">Salin peserta dari sesi ini</button>` : ''}
+        <button class="btn btn-ghost" onclick="stdIsiPesertaContoh()" title="Isi 6 peserta contoh untuk coba-coba, tanpa perlu impor Excel dulu">+ Peserta contoh</button>
       </div>
       <textarea class="field" id="stdTempelPeserta" rows="3" style="margin-top:12px"
         placeholder="…atau tempel langsung dari Excel: kolom Nama lalu Unit Kerja"></textarea>
@@ -5530,6 +5551,19 @@ function stdTambahPeserta(){
 function stdSalinPeserta(){
   const dari = N.sesi.find(x => x.id === $id('stdSalinDari').value); if(!dari) return;
   terapkanPesertaStd(dari.peserta.map(p => ({nama:p.nama, unit:p.unit})));
+}
+/* Peserta contoh — buat coba-coba alur pencatatan tanpa perlu impor Excel
+   dulu. Aman: cuma menambah (lewat terapkanPesertaStd yang tidak pernah
+   menghapus), jadi tidak butuh cadangan/konfirmasi seperti "Data Contoh". */
+function stdIsiPesertaContoh(){
+  terapkanPesertaStd([
+    {nama:'Ahmad Fauzi',      unit:'Direktorat Jenderal Pajak'},
+    {nama:'Siti Nurhaliza',   unit:'Biro Perencanaan dan Keuangan'},
+    {nama:'Budi Santoso',     unit:'Direktorat Pengelolaan Kas Negara'},
+    {nama:'Rina Kusuma Dewi', unit:'Sekretariat Jenderal'},
+    {nama:'Joko Prasetyo',    unit:'Biro Sumber Daya Manusia'},
+    {nama:'Dewi Anggraini',   unit:'Pusdiklat Anggaran dan Perbendaharaan'}
+  ]);
 }
 function stdUbahPeserta(pid){
   const s = sesiStd(), p = s.peserta.find(x => x.id === pid); if(!p) return;
@@ -5882,6 +5916,44 @@ const namaPendek = n => String(n)
   .replace(/^Kota Administrasi /, '').replace(/^Provinsi Daerah Khusus Ibukota /, 'DKI ')
   .replace(/^Provinsi Daerah Istimewa /, 'DI ').replace(/^Provinsi /, 'Prov. ');
 
+/* Kalau daerah yang terlibat ngumpul di satu wilayah kecil, peta otomatis
+   dizoom ke sana; kalau sebarannya sudah selebar peta (benar-benar
+   se-Indonesia), zoom dibatalkan dan peta ditampilkan utuh. Dihitung ulang
+   tiap render supaya menyesuaikan kondisi keaktifan daerah saat itu. */
+const ZOOM_UTUH = {tx:0, ty:0, skala:1};
+function zoomPetaSasaran(titik){
+  if(!titik.size) return ZOOM_UTUH;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  titik.forEach(p => {
+    if(p.x < minX) minX = p.x; if(p.x > maxX) maxX = p.x;
+    if(p.y < minY) minY = p.y; if(p.y > maxY) maxY = p.y;
+  });
+  const padX = 60, padY = 46, w = Math.max(maxX - minX + padX * 2, 160), h = Math.max(maxY - minY + padY * 2, 120);
+  const skala = Math.min(4, PETA_W / w, PETA_H / h);
+  if(skala < 1.18) return ZOOM_UTUH;   // sebaran sudah selebar peta — biarkan tampil utuh
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  return {tx: PETA_W / 2 - skala * cx, ty: PETA_H / 2 - skala * cy, skala};
+}
+const zoomStr = z => `translate(${z.tx.toFixed(2)},${z.ty.toFixed(2)}) scale(${z.skala.toFixed(3)})`;
+const zoomSama = (a, b) => Math.abs(a.tx - b.tx) < .5 && Math.abs(a.ty - b.ty) < .5 && Math.abs(a.skala - b.skala) < .01;
+/* Digambar lewat requestAnimationFrame (bukan CSS transition) supaya jalan
+   konsisten walau atribut transform SVG-nya diubah lewat JS, bukan style. */
+function animasiZoomPeta(g, dari, ke, durasi){
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches){ g.setAttribute('transform', zoomStr(ke)); return; }
+  const t0 = performance.now();
+  const ease = t => 1 - Math.pow(1 - t, 3);
+  (function langkah(now){
+    if(!g.isConnected) return;
+    const t = Math.min(1, (now - t0) / durasi), e = ease(t);
+    g.setAttribute('transform', zoomStr({
+      tx: dari.tx + (ke.tx - dari.tx) * e,
+      ty: dari.ty + (ke.ty - dari.ty) * e,
+      skala: dari.skala + (ke.skala - dari.skala) * e
+    }));
+    if(t < 1) requestAnimationFrame(langkah);
+  })(t0);
+}
+
 /* opt:
      sorotHost   nama daerah pengangkat yang disorot (klik titik di dashboard)
      sorotMasalah id masalah yang sedang dibahas (Layar Panggung) — busurnya
@@ -5901,6 +5973,28 @@ function renderPeta(box, opt){
   const tanpaTitik = [];
   const titik = new Map();
   daerah.forEach((v, n)=>{ const t = titikPeta(n); if(t) titik.set(n, {x:t[0], y:t[1], v}); else tanpaTitik.push(n); });
+
+  // daerah yang ibu kotanya berdempetan (mis. Kab. & Kota Semarang) titiknya
+  // nyaris menumpuk di peta — digeser tipis biar lingkaran kecil tidak
+  // "nyembul" dari lingkaran besar di sebelahnya alih-alih tertutup rapi.
+  (function pisahkanTitikBerdempetan(){
+    const jariJari = v => v.angkat ? 4 + Math.min(4, v.angkat * 1.2) : 2.6 + Math.min(2.4, v.tanggap * .6);
+    const daftar = [...titik.values()];
+    for(let putaran = 0; putaran < 3; putaran++){
+      for(let a = 0; a < daftar.length; a++){
+        for(let b = a + 1; b < daftar.length; b++){
+          const pa = daftar[a], pb = daftar[b];
+          let dx = pb.x - pa.x, dy = pb.y - pa.y, d = Math.hypot(dx, dy);
+          const batas = jariJari(pa.v) + jariJari(pb.v) + 1;
+          if(d >= batas) continue;
+          if(d < .01){ const sudut = a * 2.4; dx = Math.cos(sudut); dy = Math.sin(sudut); d = 1; }
+          const geser = (batas - d) / 2, ux = dx / d, uy = dy / d;
+          pa.x -= ux * geser; pa.y -= uy * geser;
+          pb.x += ux * geser; pb.y += uy * geser;
+        }
+      }
+    }
+  })();
 
   // relasi berarah: penanggap → pengangkat
   const relasi = new Map();
@@ -5964,29 +6058,50 @@ function renderPeta(box, opt){
   const tabrak = b => kotak.some(c => b.x1 < c.x2 && b.x2 > c.x1 && b.y1 < c.y2 && b.y2 > c.y1);
   const calon = [...titik.entries()].filter(([, p]) => p.v.angkat)
     .sort((a, b)=> (b[0] === o.sorotHost) - (a[0] === o.sorotHost) || b[1].v.angkat - a[1].v.angkat);
-  let label = '';
+  let label = '', tunjuk = '';
   calon.forEach(([n, p])=>{
     const t = namaPendek(n), w = t.length * FS * 0.56, h = FS * 1.2;
     const s = n === o.sorotHost || (o.sorotMasalah && cari(o.sorotMasalah) && cari(o.sorotMasalah).daerah.trim() === n);
-    for(const [ax, anchor] of [[p.x + 9, 'start'], [p.x - 9, 'end']]){
-      const x1 = anchor === 'start' ? ax : ax - w, b = {x1, x2:x1 + w, y1:p.y - h/2 - 1, y2:p.y + h/2};
-      if(x1 < 0 || x1 + w > PETA_W) continue;
+    // tempat pas di sebelah titik dicoba dulu; kalau semua nabrak (titik lagi rapat),
+    // geser ke diagonal atas/bawah dengan garis penunjuk tipis supaya nama tetap kebaca.
+    const posisi = [
+      [p.x + 9, p.y, 'start', false], [p.x - 9, p.y, 'end', false],
+      [p.x + 8, p.y - 14, 'start', true], [p.x - 8, p.y - 14, 'end', true],
+      [p.x + 8, p.y + 14, 'start', true], [p.x - 8, p.y + 14, 'end', true]
+    ];
+    for(const [ax, ay, anchor, garis] of posisi){
+      const x1 = anchor === 'start' ? ax : ax - w, b = {x1, x2:x1 + w, y1:ay - h/2 - 1, y2:ay + h/2};
+      if(x1 < 0 || x1 + w > PETA_W || ay < h/2 || ay > PETA_H - h/2) continue;
       if(!s && tabrak(b)) continue;
       kotak.push(b);
       const lamaL = sudah.has('L' + n) && !o.urut; sudah.add('L' + n);
-      label += `<text class="pt-label${s ? ' pt-sorot' : ''}${lamaL ? ' pt-langsung' : ''}" x="${ax}" y="${(p.y + FS * .36).toFixed(1)}" text-anchor="${anchor}">${esc(t)}</text>`;
+      if(garis) tunjuk += `<line class="pt-tunjuk${lamaL ? ' pt-langsung' : ''}" x1="${p.x}" y1="${p.y}" x2="${ax}" y2="${ay}"/>`;
+      label += `<text class="pt-label${s ? ' pt-sorot' : ''}${lamaL ? ' pt-langsung' : ''}" x="${ax}" y="${(ay + FS * .36).toFixed(1)}" text-anchor="${anchor}">${esc(t)}</text>`;
       break;
     }
   });
 
+  const zoomSasaran = zoomPetaSasaran(titik);
+  const zoomPertama = !box._zoomTerakhir;
+  const zoomAwal = zoomPertama ? ZOOM_UTUH : box._zoomTerakhir;
+
   box._sudah = sudah;
   box.innerHTML = `<svg viewBox="0 0 ${PETA_W} ${PETA_H}" role="img" aria-label="Peta jejaring ${titik.size} daerah">
+      <g class="pt-zoom" transform="${zoomStr(zoomAwal)}">
       <path class="pt-darat" d="${PETA_DARAT}"/>
-      <g>${busur}</g><g>${tamu}</g><g>${host}</g><g>${komet}</g><g>${label}</g></svg>` +
+      <g>${busur}</g><g>${tamu}</g><g>${host}</g><g>${komet}</g><g>${tunjuk}</g><g>${label}</g></g></svg>` +
     (o.nota && tanpaTitik.length ? `<div class="pt-nota">${tanpaTitik.length} daerah belum tampil di peta karena namanya bukan nama wilayah resmi:
       ${tanpaTitik.slice(0, 6).map(esc).join(', ')}${tanpaTitik.length > 6 ? ', …' : ''} — ubah lewat riwayat pembahasan.</div>` : '') +
     (!titik.size ? '<div class="empty" style="text-align:center">Titik daerah muncul di peta begitu masalah pertama diangkat.</div>' : '');
   if(o.klik) box.querySelectorAll('.pt-klik').forEach(c => c.addEventListener('click', ()=> pilihJaringFokus(c.dataset.nama)));
+
+  // tampilkan peta utuh dulu baru zoom halus ke wilayah aktif — hanya diputar ulang
+  // dari awal saat pertama kali render; sesudahnya cuma geser/skala kalau sasarannya berubah.
+  if(!zoomSama(zoomSasaran, zoomAwal)){
+    const g = box.querySelector('.pt-zoom');
+    setTimeout(()=> animasiZoomPeta(g, zoomAwal, zoomSasaran, 1050), zoomPertama ? (o.urut ? 1800 : 900) : 0);
+  }
+  box._zoomTerakhir = zoomSasaran;
 }
 function jumlahSalingBelajar(){
   const n = new Set();

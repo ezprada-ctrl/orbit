@@ -46,6 +46,15 @@ if not defined PYEXE (
   exit /b 1
 )
 
+REM Cek & pasang pembaruan otomatis sebelum aplikasi dibuka — jadi PTP tidak
+REM perlu ingat pencet Ctrl+Shift+U atau buka ORBIT-update.bat manual tiap ada
+REM rilis baru. Diam-diam dilewati kalau laptop belum tersambung internet.
+if exist "%~dp0server.py" (
+  echo   Mengecek pembaruan...
+  %PYEXE% "%~dp0server.py" --auto-update
+  echo.
+)
+
 REM Buka browser 2 detik setelah server siap
 start "" /b cmd /c "timeout /t 2 /nobreak >nul & start "" http://localhost:8200/forum-konsultasi-antar-daerah.html"
 
