@@ -3,6 +3,22 @@ cd /d "%~dp0"
 title ORBIT -- Cek Pembaruan
 color 0B
 
+if exist ".git" (
+  echo ============================================================
+  echo   ORBIT - Cek dan Pasang Pembaruan
+  echo ============================================================
+  echo.
+  echo   [DIBATALKAN] Folder ini punya ".git" - ini salinan pengembang,
+  echo   bukan salinan pasang-pakai dari rilis.
+  echo.
+  echo   Rilis GitHub bisa tertinggal dari perubahan lokal yang belum
+  echo   dirilis. Menimpanya lewat skrip ini akan menghapus balik
+  echo   pekerjaan yang sedang berjalan. Perbarui salinan ini lewat git.
+  echo.
+  pause
+  exit /b 1
+)
+
 echo ============================================================
 echo   ORBIT - Cek dan Pasang Pembaruan
 echo ============================================================

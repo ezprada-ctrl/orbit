@@ -37,6 +37,14 @@ BERKAS_APLIKASI = [
     'PANDUAN-OPERASIONAL.md',
 ]
 
+
+def salinan_pengembang():
+    """Laptop pengembang (folder ini punya .git) vs laptop PTP biasa (dari ZIP rilis).
+    Rilis GitHub bisa tertinggal dari commit lokal yang belum dirilis — menimpa
+    salinan pengembang dengan rilis lama akan menghapus balik pekerjaan yang
+    sedang berjalan. Salinan PTP tidak punya .git sama sekali, tidak terpengaruh."""
+    return os.path.isdir(os.path.join(AKAR, '.git'))
+
 IZIN = {
     '/forum-konsultasi-antar-daerah.html',
     '/bid.html',
@@ -156,7 +164,9 @@ def nama_berkas_aman(s):
 
 
 def unduh_dan_pasang_update():
-    """Tarik rilis terbaru dari GitHub lalu pasang di tempat.
+    """Tarik rilis terbaru dari GitHub lalu pasang di tempat. Mengembalikan
+    ETag rilis yang baru dipasang (dicatat pemanggil ke TANDA_VERSI), atau
+    None bila server rilis tidak mengirim ETag/Last-Modified.
 
     Unduh + baca ZIP dulu SAMPAI SELESAI sebelum menyentuh berkas apa pun di
     folder aplikasi — supaya koneksi putus di tengah jalan tidak pernah
@@ -170,6 +180,7 @@ def unduh_dan_pasang_update():
     try:
         with urllib.request.urlopen(permintaan, timeout=30) as r:
             data = r.read()
+            etag = r.headers.get('ETag') or r.headers.get('Last-Modified')
     except Exception as e:
         raise RuntimeError('Tidak bisa mengunduh pembaruan (periksa internet): %s' % e)
 
@@ -182,7 +193,9 @@ def unduh_dan_pasang_update():
     if 'server.py' not in nama_di_zip:
         raise RuntimeError('Paket rilis tidak lengkap (server.py tidak ada di dalamnya).')
 
-    folder_cadangan = os.path.join(AKAR, 'cadangan-sebelum-update')
+    # per-waktu, bukan menimpa satu folder cadangan yang sama tiap kali —
+    # update sebelumnya tetap bisa ditengok/dipulihkan manual bila perlu.
+    folder_cadangan = os.path.join(AKAR, 'cadangan-sebelum-update', time.strftime('%Y%m%d-%H%M%S'))
     os.makedirs(folder_cadangan, exist_ok=True)
     for nama in BERKAS_APLIKASI:
         asal = os.path.join(AKAR, nama)
@@ -197,6 +210,7 @@ def unduh_dan_pasang_update():
             continue
         with z.open(nama) as sumber, open(os.path.join(AKAR, nama), 'wb') as tujuan:
             tujuan.write(sumber.read())
+    return etag
 
 
 TANDA_VERSI = os.path.join(AKAR, '.versi-terpasang')   # dicatat lokal saja — tidak ikut ke-zip, tidak ikut git
@@ -217,6 +231,9 @@ def cek_dan_pasang_update_otomatis():
     titik awal. Tanpa ini, tiap perubahan lokal yang belum sempat dirilis
     (mis. sedang dikembangkan) akan langsung tertimpa balik ke rilis lama
     pada percobaan pertama."""
+    if salinan_pengembang():
+        print('  (salinan pengembang terdeteksi — cek pembaruan otomatis dilewati; pakai git)')
+        return
     import urllib.request
     try:
         req = urllib.request.Request(RILIS_ZIP_URL, headers={'User-Agent': 'ORBIT-update'}, method='HEAD')
@@ -434,10 +451,21 @@ class Penangan(SimpleHTTPRequestHandler):
             return self.kirim_json({'ok': True})
 
         if jalur == '/api/update':
+            if salinan_pengembang():
+                return self.kirim_json({'ok': False, 'pesan':
+                    'Ini salinan pengembang (folder .git ada) — pembaruan lewat tombol ini '
+                    'dimatikan supaya tidak menimpa balik pekerjaan yang belum dirilis. '
+                    'Perbarui salinan ini lewat git, bukan lewat tombol Update.'})
             try:
-                unduh_dan_pasang_update()
+                etag = unduh_dan_pasang_update()
             except Exception as e:
                 return self.kirim_json({'ok': False, 'pesan': str(e)})
+            if etag:
+                try:
+                    with open(TANDA_VERSI, 'w', encoding='utf-8') as f:
+                        f.write(etag)
+                except OSError:
+                    pass
             self.kirim_json({'ok': True, 'pesan': 'Update terpasang. Menyalakan ulang server...'})
             threading.Thread(target=mulai_ulang_server, daemon=True).start()
             return
