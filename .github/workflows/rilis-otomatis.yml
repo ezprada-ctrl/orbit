@@ -1,0 +1,50 @@
+name: Rilis otomatis
+
+# Tiap kali ada perubahan yang masuk ke main, langsung dibungkus jadi rilis
+# baru (ORBIT.zip) dan diterbitkan sebagai "latest" di GitHub Releases.
+# Tujuannya: PTP yang pencet Ctrl+Shift+U (atau ORBIT-execute.bat, atau
+# ORBIT-update.bat) SELALU dapat kode yang sama persis dengan yang ada di
+# main — tidak pernah ketinggalan tag lama lagi seperti insiden 2026-09-30
+# (main sudah maju 1 komit tapi rilis GitHub masih di v1.4.0).
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  rilis:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # perlu riwayat tag lengkap buat hitung versi berikutnya
+
+      - name: Tentukan nomor versi berikutnya
+        id: versi
+        run: |
+          TERAKHIR=$(git tag --list 'v*' --sort=-v:refname | head -n1)
+          if [ -z "$TERAKHIR" ]; then TERAKHIR="v1.0.0"; fi
+          BASE=${TERAKHIR#v}
+          IFS='.' read -r MA MI PA <<< "$BASE"
+          TAG="v$MA.$MI.$((PA + 1))"
+          echo "Rilis terakhir: $TERAKHIR -> rilis baru: $TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Susun paket ORBIT.zip
+        run: |
+          mkdir paket
+          cp ORBIT-execute.bat ORBIT-update.bat ORBIT-buat-shortcut-update.bat \
+             server.py forum-konsultasi-antar-daerah.html bid.html index.html \
+             PANDUAN-OPERASIONAL.md paket/
+          (cd paket && zip -r ../ORBIT.zip .)
+
+      - name: Terbitkan rilis
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.versi.outputs.tag }}" ORBIT.zip \
+            --title "ORBIT ${{ steps.versi.outputs.tag }}" \
+            --generate-notes \
+            --latest
