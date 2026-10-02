@@ -283,9 +283,12 @@ Kendali otomatis kembali ke PTP. Siap untuk masalah berikutnya.
 | Nama daerah / judul salah | Dari dashboard, klik baris masalahnya → **"Ubah / hapus"** |
 | Nama daerah salah ketik di banyak tempat | Saat mengubah nama, aplikasi menawarkan *ganti di seluruh sesi* — jawab **OK** |
 | Tombol simpan seperti tidak berfungsi | Ada kolom wajib yang kosong. Kolom itu akan **bergetar dan disoroti merah**, lalu layar menggulir ke sana. Isi kolomnya, simpan lagi |
-| Terlanjur keluar dari pembahasan | Di dashboard ada tombol **"Lanjutkan pembahasan aktif"** |
+| Terlanjur keluar dari pembahasan | Di dashboard, tombol biru **"Lanjutkan: (judul masalah) →"** ada paling atas, tepat di bawah angka |
 | Tersesat di layar mana pun | Tombol **"Dashboard"** selalu ada di pojok kanan atas |
 | WI terlanjur masuk tapi belum siap | Klik **PTP** di saklar. Draf yang sudah diketik tidak hilang |
+| Browser ter-refresh / laptop hang di tengah pembahasan | Buka lagi. Aplikasi langsung kembali ke pembahasan yang sedang berjalan; draf kesimpulan WI yang sedang diketik ikut tersimpan |
+| Lupa klik **Catat** lalu langsung alihkan ke WI | Aplikasi menahan dan bertanya — jawab **OK** supaya tanggapan itu ikut tercatat sebelum WI menyimpulkan |
+| PDF gagal diunduh karena internet sempat mati | Nyalakan internet, klik tombol PDF lagi — tidak perlu muat ulang halaman |
 
 ---
 

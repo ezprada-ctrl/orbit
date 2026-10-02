@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Forum Konsultasi Antar-Daerah</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- defer: WiFi diklat yang lambat/berportal tidak boleh menahan aplikasi tampil (lihat pastikanPDF) -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 /* ============================================================
    1. DESIGN TOKENS — semua warna lewat CSS custom properties.
@@ -454,6 +455,8 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
 
 .cta-bar{display:flex;gap:14px;flex-wrap:wrap;margin-top:34px;
   padding-top:26px;border-top:1px solid var(--line)}
+/* aksi berikutnya langsung di bawah angka — tidak perlu menggulir di layar 768px */
+.cta-atas{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:0 0 34px}
 
 /* ---- Baris data sesi: pemindahan data antar-laptop ---- */
 .data-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;
@@ -1270,6 +1273,13 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
       <div class="stat"><div class="num" id="stTanggapan">0</div><div class="lbl">Tanggapan Terkumpul</div></div>
     </div>
 
+    <div class="cta-atas">
+      <button class="btn btn-primary btn-lg" id="lanjutBtn" style="display:none" onclick="lanjutkanAktif()">Lanjutkan pembahasan aktif →</button>
+      <button class="btn btn-primary btn-lg" id="angkatBtn" onclick="bukaFormMasalah()">+ &nbsp;Angkat Masalah Baru</button>
+      <button class="btn btn-wi btn-lg" id="tutupBtn" style="display:none"
+        onclick="bukaTutup()">Tutup Sesi &amp; Tampilkan Hasil</button>
+    </div>
+
     <div class="sec-head"><h3 id="jaringJudul">Jaring Forum</h3><div class="line"></div>
       <div class="seg-mini" id="segJaring"><button data-v="jaring" onclick="gantiTampilJaring('jaring')">Jaring</button><button data-v="peta" onclick="gantiTampilJaring('peta')">Peta Indonesia</button></div>
     </div>
@@ -1304,10 +1314,6 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
     <div class="timeline" id="timeline"></div>
 
     <div class="cta-bar">
-      <button class="btn btn-primary btn-lg" onclick="bukaFormMasalah()">+ &nbsp;Angkat Masalah Baru</button>
-      <button class="btn btn-wi btn-lg" id="tutupBtn" style="display:none"
-        onclick="bukaTutup()">Tutup Sesi &amp; Tampilkan Hasil</button>
-      <button class="btn btn-ghost" id="lanjutBtn" style="display:none" onclick="lanjutkanAktif()">Lanjutkan pembahasan aktif →</button>
       <button class="btn btn-liga btn-lg" onclick="bukaLiga()">Liga Inovasi</button>
       <button class="btn btn-ghost" onclick="cekSiapKelas()">Cek Siap Kelas</button>
       <button class="btn btn-ghost" id="btnKembaliContoh" style="display:none;margin-left:auto;color:var(--warn);border-color:var(--warn)"
@@ -1702,7 +1708,7 @@ const WILAYAH = (()=>{
 const WILAYAH_SET = new Set(WILAYAH.map(w=>w.n.toLowerCase()));
 
 let S = {
-  tanggal: new Date().toISOString().slice(0,10),
+  tanggal: new Date().toLocaleDateString('sv'),
   mode: 'PTP',          // 'PTP' | 'WI' — hanya satu yang aktif (RULES)
   aktifId: null,        // id masalah yang sedang dalam siklus
   masalah: []           // {id,daerah,judul,deskripsi,status,tanggapan[],kesimpulan}
@@ -1752,7 +1758,7 @@ function bungkusData(){
 function bukaData(obj){
   const s = (obj && obj.sesi) ? obj.sesi : obj;
   if(!s || !Array.isArray(s.masalah)) throw new Error('Berkas ini bukan data sesi Forum Konsultasi.');
-  return {tanggal: s.tanggal || new Date().toISOString().slice(0,10),
+  return {tanggal: s.tanggal || new Date().toLocaleDateString('sv'),
           mode: 'PTP', aktifId: s.aktifId || null, masalah: s.masalah};
 }
 
@@ -1940,6 +1946,8 @@ function masalahSelesai(){ return S.masalah.filter(m=>m.status==='selesai'); }
 const sedangBerjalan = m => m.status !== 'selesai' && m.status !== 'tunda';
 function masalahBerjalan(){ return S.masalah.filter(sedangBerjalan); }
 function cari(id){ return S.masalah.find(m=>m.id===id); }
+// m.kesimpulan juga menampung draf WI yang belum final — draf tidak boleh tampil sebagai kesimpulan forum
+const kesimpulanFinal = m => m.status === 'selesai' ? (m.kesimpulan || '') : '';
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ==================================================================
@@ -2039,7 +2047,9 @@ function sorotiKolom(el, pesan){
 function toast(msg){
   const el = document.getElementById('toast');
   el.textContent = msg; el.classList.add('on');
-  clearTimeout(el._t); el._t = setTimeout(()=>el.classList.remove('on'), 2200);
+  // lama tampil mengikuti panjang kalimat — peringatan 120 huruf tidak terbaca dalam 2 detik
+  const lama = Math.max(2400, Math.min(7000, 1200 + String(msg).length * 45));
+  clearTimeout(el._t); el._t = setTimeout(()=>el.classList.remove('on'), lama);
 }
 
 /* ==================================================================
@@ -2107,10 +2117,14 @@ function renderDashboard(){
   const lb = document.getElementById('lanjutBtn');
   lb.style.display = aktif ? 'inline-flex' : 'none';
   if(aktif) lb.textContent = 'Lanjutkan: ' + aktif.judul + ' →';
+  // masalah baru terkunci selama ada yang berjalan — tombol menonjol hanya satu: langkah berikutnya
+  document.getElementById('angkatBtn').className = 'btn btn-lg ' + (aktif ? 'btn-ghost' : 'btn-primary');
 
   // Tutup Sesi baru relevan setelah ada kesimpulan — menjaga bar tombol tetap ringkas
-  document.getElementById('tutupBtn').style.display =
-    masalahSelesai().length ? 'inline-flex' : 'none';
+  const tb = document.getElementById('tutupBtn');
+  tb.style.display = masalahSelesai().length ? 'inline-flex' : 'none';
+  // selagi masih ada pembahasan berjalan, penutupan bukan langkah berikutnya — jangan bersaing dengan "Lanjutkan"
+  tb.className = 'btn btn-lg ' + (aktif ? 'btn-ghost' : 'btn-wi');
 }
 
 /* Diklik dari titik pengangkat masalah di Jaring Forum (lihat renderJaring).
@@ -2936,6 +2950,9 @@ function renderSasaran(m){
 
 function renderTanggapan(){
   const m = cari(S.aktifId); if(!m) return go('dash');
+  // ketikan yang belum dicatat milik masalah lain tidak boleh ikut tercatat di masalah ini
+  const tgI = $id('tgIsi');
+  if(tgI.dataset.mid !== m.id){ $id('tgDaerah').value = ''; tgI.value = ''; tgI.dataset.mid = m.id; }
   document.getElementById('ctxTanggapan').innerHTML = blokKonteks(m);
   renderSasaran(m);
   renderLigaTg();   // Liga Inovasi: jendela bid / pemenang untuk masalah ini
@@ -3019,6 +3036,15 @@ function lanjutkanAktif(){
 /* --- Transisi ke Mode WI: momen "reveal" paling berbobot di aplikasi --- */
 function masukModeWI(){
   const m = cari(S.aktifId); if(!m) return;
+  // tanggapan yang sudah diketik tapi lupa dicatat akan hilang dari risalah bila giliran pindah ke WI
+  const tgD = $id('tgDaerah'), tgI = $id('tgIsi');
+  if(tgI.dataset.mid === m.id && tgI.value.trim()){
+    if(layarSekarang !== 'tanggapan'){ go('tanggapan'); renderTanggapan(); }
+    if(!tgD.value.trim()){ sorotiKolom(tgD, 'Ada tanggapan yang belum dicatat — isi daerahnya lalu klik Catat, atau kosongkan isinya.'); return; }
+    if(!confirm('Tanggapan dari ' + tgD.value.trim() + ' belum dicatat:\n\n"' + tgI.value.trim().slice(0, 160)
+        + '"\n\nOK = catat dulu, lalu alihkan ke Widyaiswara\nBatal = kembali ke layar tanggapan')) return;
+    tambahTanggapan();
+  }
   if(!ligaBolehWI(m)) return;   // Liga: pemenang bid ditetapkan SEBELUM WI menyimpulkan
   if(!m.tanggapan.length && !confirm('Belum ada tanggapan yang tercatat. Tetap alihkan ke Widyaiswara?')) return;
   setMode('WI');
@@ -3043,6 +3069,13 @@ function lepasGiliranWI(){
   setMode('PTP');
   return m;
 }
+// draf ikut tersimpan selagi diketik: kesimpulan WI tidak hilang bila browser ter-refresh/crash
+document.getElementById('wiKesimpulan').addEventListener('input', ()=>{
+  const m = cari(S.aktifId);
+  if(!m || S.mode !== 'WI' || !sedangBerjalan(m)) return;
+  m.kesimpulan = document.getElementById('wiKesimpulan').value;
+  simpan();
+});
 
 function batalModeWI(){
   const m = lepasGiliranWI();
@@ -3157,7 +3190,7 @@ function renderTutup(){
    angkatan berikutnya di laptop yang sama akan menumpuk di atas data lama. */
 function sesiBaru(){
   if(!confirm('Mulai sesi baru?\n\nSeluruh data sesi saat ini (masalah, tanggapan, kesimpulan) akan dihapus dari perangkat ini. Pastikan PDF sudah diunduh terlebih dahulu.')) return;
-  S = {tanggal:new Date().toISOString().slice(0,10), mode:'PTP', aktifId:null, masalah:[]};
+  S = {tanggal:new Date().toLocaleDateString('sv'), mode:'PTP', aktifId:null, masalah:[]};
   prevStats = {m:0, d:0, t:0};
   simpan(); setMode('PTP'); go('welcome');
   toast('Sesi baru siap dimulai.');
@@ -3187,7 +3220,8 @@ function ubahMasalah(id){
 
 function simpanUbah(id){
   const m = cari(id); if(!m) return;
-  const d = document.getElementById('edD').value.trim();
+  // diseragamkan sama seperti saat diangkat — "sleman" tidak boleh jadi daerah kedua di samping "Kabupaten Sleman"
+  const d = kanonDaerah(document.getElementById('edD').value.trim());
   const j = document.getElementById('edJ').value.trim();
   if(!d || !j){ toast('Daerah dan judul tidak boleh kosong.'); return; }
 
@@ -3235,7 +3269,7 @@ function lihatDetail(id){
     ${m.tanggapan.length ? '<ul class="rk-list">'+m.tanggapan.map(t=>`<li><b>${esc(t.daerah)}</b> — ${esc(t.isi)}</li>`).join('')+'</ul>'
       : '<div class="empty">Belum ada tanggapan.</div>'}
     <div class="rk-lbl">Kesimpulan Forum</div>
-    ${m.kesimpulan ? `<div class="rk-concl">${esc(m.kesimpulan)}</div>` : '<div class="empty">Belum disimpulkan.</div>'}
+    ${kesimpulanFinal(m) ? `<div class="rk-concl">${esc(kesimpulanFinal(m))}</div>` : '<div class="empty">Belum disimpulkan.</div>'}
     <div style="display:flex;gap:12px;margin-top:26px;align-items:center">
       ${sedangBerjalan(m) ? `<button class="btn btn-primary" onclick="bukaMasalah('${m.id}')">Lanjutkan pembahasan</button>
         <button class="btn btn-ghost" onclick="tundaMasalah('${m.id}')">Tunda masalah ini</button>` : ''}
@@ -3325,7 +3359,7 @@ function renderRekap(){
         ${m.tanggapan.length ? '<ul class="rk-list">'+m.tanggapan.map(t=>`<li><b>${esc(t.daerah)}</b> — ${esc(t.isi)}</li>`).join('')+'</ul>'
           : '<div class="empty">Belum ada tanggapan.</div>'}
         <div class="rk-lbl">Kesimpulan Forum</div>
-        ${m.kesimpulan ? `<div class="rk-concl">${esc(m.kesimpulan)}</div>` : '<div class="empty">Belum disimpulkan.</div>'}
+        ${kesimpulanFinal(m) ? `<div class="rk-concl">${esc(kesimpulanFinal(m))}</div>` : '<div class="empty">Belum disimpulkan.</div>'}
       </div>`).join('');
     wrap.insertAdjacentHTML('beforeend', `
       <div class="acc open">
@@ -3373,10 +3407,31 @@ function bulanID(d){
   return d.getDate() + ' ' + b[d.getMonth()] + ' ' + d.getFullYear();
 }
 
+/* Font bawaan jsPDF hanya mengenal WinAnsi. Satu karakter di luar itu (→, ≥,
+   emoji — lazim terbawa dari WhatsApp/Word) membuat jsPDF mengubah SELURUH
+   baris jadi huruf renggang + simbol sampah yang meluber keluar halaman. */
+const PDF_GANTI = {'→':'->','←':'<-','↔':'<->','⇒':'=>','⇐':'<=','≥':'>=','≤':'<=','≠':'!=','≈':'~',
+  '−':'-','‐':'-','‑':'-','′':"'",'″':'"','✓':'v','✔':'v','✗':'x','✘':'x',
+  '●':'•','○':'•','■':'•','□':'•','▪':'•','◦':'•','►':'•','▶':'•','➢':'•','➤':'•'};
+const WINANSI_EKSTRA = '€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ';
+function amanPDF(s){
+  return Array.from(String(s)).map(c => {
+    if(PDF_GANTI[c]) return PDF_GANTI[c];
+    const k = c.codePointAt(0);
+    if(c === '\n' || c === '\t' || (k >= 0x20 && k <= 0x7E) || (k >= 0xA0 && k <= 0xFF) || WINANSI_EKSTRA.includes(c)) return c;
+    return '';
+  }).join('');
+}
+
 /** Konteks dokumen: membungkus jsPDF + kursor Y + judul untuk header/footer. */
 function buatDoc(judulPendek){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'mm', format:'a4'});
+  const aman = v => typeof v === 'string' ? amanPDF(v) : Array.isArray(v) ? v.map(aman) : v;
+  const asliTeks = doc.text.bind(doc), asliPotong = doc.splitTextToSize.bind(doc), asliLebar = doc.getTextWidth.bind(doc);
+  doc.text = (t, ...r) => asliTeks(aman(t), ...r);
+  doc.splitTextToSize = (t, ...r) => asliPotong(aman(t), ...r);
+  doc.getTextWidth = t => asliLebar(aman(t));
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   return { doc, W, H, y: PDF.TOP, judulPendek, halKonten: 0 };
@@ -3580,7 +3635,7 @@ function blokMasalah(ctx, m, nomor){
 
   // wrap-up widyaiswara — bagian paling otoritatif
   labelBagian(ctx, 'Wrap-up Widyaiswara — Kesimpulan Forum', PDF.acc2);
-  kotakBeraksen(ctx, [{teks: m.kesimpulan || 'Belum disimpulkan pada sesi ini.'}], PDF.acc2, [242, 247, 243]);
+  kotakBeraksen(ctx, [{teks: kesimpulanFinal(m) || 'Belum disimpulkan pada sesi ini.'}], PDF.acc2, [242, 247, 243]);
 
   // opsi lain di forum — polos, tanpa sorotan
   const lain = m.tanggapan.filter((t,i) => !indeks.has(i));
@@ -3631,14 +3686,13 @@ function halamanTakeaways(ctx, daftar){
 function namaFile(s){ return s.replace(/[^\w\s-]/g,'').replace(/\s+/g,'-').toLowerCase(); }
 
 function cekSiap(){
-  if(!window.jspdf){ toast('Library PDF gagal dimuat — periksa koneksi internet.'); return false; }
   if(!S.masalah.length){ toast('Belum ada data untuk diekspor.'); return false; }
   return true;
 }
 
 /* --- Ekspor 1: risalah lengkap seluruh sesi, dikelompokkan per daerah --- */
-function exportLengkap(){
-  if(!cekSiap()) return;
+async function exportLengkap(){
+  if(!cekSiap() || !(await pastikanPDF())) return;
   const tgl = bulanID(tanggalLokal(S.tanggal));
   const ctx = buatDoc('Risalah Forum Konsultasi Antar-Daerah');
   sampul(ctx, 'Risalah Forum\nKonsultasi Antar-Daerah',
@@ -3669,15 +3723,15 @@ function exportLengkap(){
     list.forEach(m=>{ n++; blokMasalah(ctx, m, n); });
   });
 
-  halamanTakeaways(ctx, S.masalah.filter(m=>m.kesimpulan)
+  halamanTakeaways(ctx, S.masalah.filter(kesimpulanFinal)
     .map(m=>({daerah: m.daerah + ' — ' + m.judul, teks: m.kesimpulan})));
   ctx.doc.save('risalah-forum-konsultasi-' + S.tanggal + '.pdf');
   toast('Risalah lengkap diunduh.');
 }
 
 /* --- Ekspor 2: satu daerah saja, semua masalahnya tergabung dalam 1 dokumen --- */
-function exportPerDaerah(){
-  if(!cekSiap()) return;
+async function exportPerDaerah(){
+  if(!cekSiap() || !(await pastikanPDF())) return;
   const daerah = document.getElementById('selDaerah').value;
   const list = kelompokPerDaerah().get(daerah);
   if(!list || !list.length){ toast('Daerah tidak ditemukan.'); return; }
@@ -3694,7 +3748,7 @@ function exportPerDaerah(){
   paragraf(ctx, list.length + ' masalah diangkat pada sesi ini.', {style:'bold', after:8});
 
   list.forEach((m,i)=> blokMasalah(ctx, m, i+1));
-  halamanTakeaways(ctx, list.filter(m=>m.kesimpulan).map(m=>({daerah:m.judul, teks:m.kesimpulan})));
+  halamanTakeaways(ctx, list.filter(kesimpulanFinal).map(m=>({daerah:m.judul, teks:m.kesimpulan})));
   ctx.doc.save('rekap-' + namaFile(daerah) + '-' + S.tanggal + '.pdf');
   toast('Rekap ' + daerah + ' diunduh.');
 }
@@ -3844,6 +3898,7 @@ pasangDikte('wiKesimpulan', 'micWi');
 const LKEY = 'liga-inovasi-v1';
 const SKOR_MENANG = 3, SKOR_KALAH = -1;
 const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 const QR_URL   = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
 
 function ligaKosong(){
@@ -4011,9 +4066,14 @@ function kanonDaerah(s){
   if(persis) return persis.n;
   const alias = ALIAS_DAERAH[k.replace(/^provinsi\s+/, '')];
   if(alias) return alias;
-  const prov = WILAYAH.find(x => x.p === 'Provinsi' && x.c === k.replace(/^provinsi\s+/, ''));
-  if(prov) return prov.n;
-  const inti = WILAYAH.filter(x => x.c === k);
+  // Nama inti dicocokkan tanpa "Administrasi" (wilayah DKI). Provinsi ikut di daftar
+  // ini, jadi "Jawa Barat" tetap unik, sedangkan "Jambi"/"Bengkulu"/"Gorontalo"
+  // (provinsi sekaligus kota) dibiarkan ambigu — dulu diam-diam dianggap provinsi.
+  const tanpaAdm = c => c.replace(/^administrasi\s+/, '');
+  const jenis = (k.match(/^(kota|kabupaten)\s+/) || [])[1];
+  const kunci = jenis ? k.slice(jenis.length + 1) : k;
+  const inti = WILAYAH.filter(x => (x.c === kunci || tanpaAdm(x.c) === kunci)
+    && (!jenis || x.n.toLowerCase().startsWith(jenis + ' ')));
   if(inti.length === 1) return inti[0].n;
   return t;
 }
@@ -4077,6 +4137,13 @@ async function pastikanXLSX(){
   if(window.XLSX) return true;
   try{ await muatSkrip(XLSX_URL); }catch(e){}
   return !!window.XLSX;
+}
+// pemuatan awal (defer) bisa gagal bila internet kelas baru menyala belakangan — dicoba lagi saat dibutuhkan
+async function pastikanPDF(){
+  if(window.jspdf) return true;
+  try{ await muatSkrip(JSPDF_URL); }catch(e){}
+  if(!window.jspdf) toast('Library PDF gagal dimuat — periksa koneksi internet, lalu klik lagi.');
+  return !!window.jspdf;
 }
 
 async function imporRoster(f){
@@ -5115,7 +5182,7 @@ function muatContoh(jmlMasalah, jmlPenanggap){
     if(n.indexOf('Provinsi') !== 0 && hostTetap.indexOf(n) < 0 && pool.indexOf(n) < 0) pool.push(n);
   }
 
-  S = {tanggal:new Date().toISOString().slice(0,10), mode:'PTP', aktifId:null, masalah:[], contoh:true};
+  S = {tanggal:new Date().toLocaleDateString('sv'), mode:'PTP', aktifId:null, masalah:[], contoh:true};
   let idx = 0;
   for(let k = 0; k < jmlMasalah; k++){
     const tg = [], jml = (k % 2 === 0) ? 4 : 5;
@@ -5757,10 +5824,9 @@ function cekSiapStd(s){
   return true;
 }
 
-function stdEksporPDF(sid){
+async function stdEksporPDF(sid){
   const s = sid ? N.sesi.find(x => x.id === sid) : sesiStd();
-  if(!s || !cekSiapStd(s)) return;
-  if(!window.jspdf){ toast('Library PDF gagal dimuat — periksa koneksi internet.'); return; }
+  if(!s || !cekSiapStd(s) || !(await pastikanPDF())) return;
   const judul = judulSesiStd(s), tgl = bulanID(tanggalLokal(s.tanggal));
   const ctx = buatDoc(judul.length > 80 ? judul.slice(0,78) + '…' : judul);
   ctx.kaki = 'Notulen ' + s.jenis;
@@ -7118,9 +7184,12 @@ async function cekSiapKelas(){
     // data forum tetap dimuat (beku) — hanya tampilannya yang diganti notulen
     setMode('PTP'); terapkanModeApp('standar'); pulihkanBerkas().then(()=>{ if(modeApp === 'standar') go('std'); });
   }else if(!pakaiContoh){
-    // pulihkan sesi yang sempat ter-refresh — kendali selalu kembali ke PTP
+    // pulihkan sesi yang sempat ter-refresh — kendali selalu kembali ke PTP,
+    // langsung ke pembahasan yang sedang berjalan supaya kelas tidak kehilangan jejak
     setMode('PTP');
-    if(S.masalah.length) go('dash');
+    const aktif = cari(S.aktifId);
+    if(aktif && sedangBerjalan(aktif)){ go('tanggapan'); renderTanggapan(); }
+    else if(S.masalah.length) go('dash');
     // berkas tersambung diperiksa belakangan karena sifatnya asinkron;
     // isinya menang atas simpanan browser agar sesi bisa pindah laptop
     pulihkanBerkas();
