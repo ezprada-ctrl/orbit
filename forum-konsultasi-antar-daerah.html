@@ -3876,6 +3876,212 @@ pasangDikte('wiKesimpulan', 'micWi');
 
 
 /* ==================================================================
+   BAGIAN H0 — UTILITAS BERSAMA
+   ------------------------------------------------------------------
+   Alat umum yang dipakai beberapa bagian sekaligus — Liga Inovasi,
+   Penilaian Sesi, Cek Siap Kelas, Mode Standar, generator PDF. Dulu
+   menumpang di BAGIAN H karena Liga yang pertama membutuhkannya; kini
+   dipisah supaya Liga bisa dilepas tanpa ikut merusak fitur lain.
+   ================================================================== */
+const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+const QR_URL   = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+
+const hariIni = () => new Date().toLocaleDateString('sv');   // YYYY-MM-DD waktu lokal
+const $id = id => document.getElementById(id);
+
+/* --- server lokal (server.py). Tanpa server, liga tetap jalan penuh
+       lewat input manual PTP; yang hilang hanya bid dari HP & arsip ke disk. --- */
+let ligaServer = null;           // null = belum dicek, false = tidak ada, objek = info server
+async function cekServer(){
+  try{
+    const j = await (await fetch('/api/info', {cache:'no-store'})).json();
+    ligaServer = j && j.ok ? j : false;
+  }catch(e){ ligaServer = false; }
+  return ligaServer;
+}
+async function api(jalur, data){
+  const r = await fetch(jalur, {method:'POST', headers:{'Content-Type':'application/json'},
+                                body:JSON.stringify(data)});
+  return r.json();
+}
+
+const intiDaerah = s => normal(s).replace(/^provinsi\s+/, '');
+const samaDaerah = (a, b) => intiDaerah(a) === intiDaerah(b);
+
+/* STANDAR NAMA DAERAH ROSTER — daerah peserta diseragamkan ke nama wilayah
+   resmi (WILAYAH, Kepmendagri) yang juga dipakai kolom daerah di forum. Tanpa
+   ini "Jawa Barat" di Excel panitia tidak pernah cocok dengan "Provinsi Jawa
+   Barat" di forum: pemilik masalah tidak terisi otomatis dan tanggapan tidak
+   tertaut ke bid. Urutan percobaan:
+     1. nama resmi persis            "Kabupaten Sleman"
+     2. singkatan umum               "Kab. Sleman", "Pemkot Medan", "DKI Jakarta"
+     3. nama provinsi tanpa awalan   "Jawa Barat" → "Provinsi Jawa Barat"
+     4. nama inti yang unik          "Sleman" → "Kabupaten Sleman"
+   Nama yang ambigu ("Bandung": kota/kabupaten) atau tidak dikenal dibiarkan
+   apa adanya dan ditandai di tabel peserta supaya PTP membetulkannya. */
+const ALIAS_DAERAH = {
+  'dki jakarta':'Provinsi Daerah Khusus Ibukota Jakarta', 'jakarta':'Provinsi Daerah Khusus Ibukota Jakarta',
+  'dki':'Provinsi Daerah Khusus Ibukota Jakarta',
+  'di yogyakarta':'Provinsi Daerah Istimewa Yogyakarta', 'diy':'Provinsi Daerah Istimewa Yogyakarta',
+  'yogyakarta':'Provinsi Daerah Istimewa Yogyakarta', 'jogja':'Provinsi Daerah Istimewa Yogyakarta',
+  'bangka belitung':'Provinsi Kepulauan Bangka Belitung', 'babel':'Provinsi Kepulauan Bangka Belitung',
+  'kep. bangka belitung':'Provinsi Kepulauan Bangka Belitung',
+  'kepri':'Provinsi Kepulauan Riau', 'kep. riau':'Provinsi Kepulauan Riau',
+  'ntb':'Provinsi Nusa Tenggara Barat', 'ntt':'Provinsi Nusa Tenggara Timur',
+  'sumut':'Provinsi Sumatera Utara', 'sumbar':'Provinsi Sumatera Barat', 'sumsel':'Provinsi Sumatera Selatan',
+  'jabar':'Provinsi Jawa Barat', 'jateng':'Provinsi Jawa Tengah', 'jatim':'Provinsi Jawa Timur',
+  'kalbar':'Provinsi Kalimantan Barat', 'kalteng':'Provinsi Kalimantan Tengah', 'kalsel':'Provinsi Kalimantan Selatan',
+  'kaltim':'Provinsi Kalimantan Timur', 'kaltara':'Provinsi Kalimantan Utara',
+  'sulut':'Provinsi Sulawesi Utara', 'sulteng':'Provinsi Sulawesi Tengah', 'sulsel':'Provinsi Sulawesi Selatan',
+  'sultra':'Provinsi Sulawesi Tenggara', 'sulbar':'Provinsi Sulawesi Barat', 'malut':'Provinsi Maluku Utara'
+};
+function kanonDaerah(s){
+  let t = rapi(String(s || ''));
+  if(!t) return t;
+  t = t.replace(/^(kab\.?|pemkab\.?)\s+/i, 'Kabupaten ')
+       .replace(/^(pemkot\.?)\s+/i, 'Kota ')
+       .replace(/^(prov\.?|pemprov\.?)\s+/i, 'Provinsi ');
+  const k = t.toLowerCase();
+  const persis = WILAYAH.find(x => x.n.toLowerCase() === k);
+  if(persis) return persis.n;
+  const alias = ALIAS_DAERAH[k.replace(/^provinsi\s+/, '')];
+  if(alias) return alias;
+  // Nama inti dicocokkan tanpa "Administrasi" (wilayah DKI). Provinsi ikut di daftar
+  // ini, jadi "Jawa Barat" tetap unik, sedangkan "Jambi"/"Bengkulu"/"Gorontalo"
+  // (provinsi sekaligus kota) dibiarkan ambigu — dulu diam-diam dianggap provinsi.
+  const tanpaAdm = c => c.replace(/^administrasi\s+/, '');
+  const jenis = (k.match(/^(kota|kabupaten)\s+/) || [])[1];
+  const kunci = jenis ? k.slice(jenis.length + 1) : k;
+  const inti = WILAYAH.filter(x => (x.c === kunci || tanpaAdm(x.c) === kunci)
+    && (!jenis || x.n.toLowerCase().startsWith(jenis + ' ')));
+  if(inti.length === 1) return inti[0].n;
+  return t;
+}
+const daerahStandar = d => WILAYAH_SET.has(String(d || '').toLowerCase());
+
+function teksKeBaris(t){
+  const baris = t.replace(/^﻿/, '').split(/\r?\n/);
+  const pem = /\t/.test(t) ? '\t' : (/;/.test(baris[0]) ? ';' : ',');
+  return baris.map(b => b.split(pem).map(c => c.replace(/^"(.*)"$/, '$1')));
+}
+
+function muatSkrip(src){
+  return new Promise((ok, gagal)=>{
+    const s = document.createElement('script');
+    s.src = src; s.onload = ok; s.onerror = ()=> gagal(new Error('gagal memuat ' + src));
+    document.head.appendChild(s);
+  });
+}
+async function pastikanXLSX(){
+  if(window.XLSX) return true;
+  try{ await muatSkrip(XLSX_URL); }catch(e){}
+  return !!window.XLSX;
+}
+// pemuatan awal (defer) bisa gagal bila internet kelas baru menyala belakangan — dicoba lagi saat dibutuhkan
+async function pastikanPDF(){
+  if(window.jspdf) return true;
+  try{ await muatSkrip(JSPDF_URL); }catch(e){}
+  if(!window.jspdf) toast('Library PDF gagal dimuat — periksa koneksi internet, lalu klik lagi.');
+  return !!window.jspdf;
+}
+
+/* Kolom cari peserta — pola sama dengan combobox daerah: ketik minimal 1 huruf
+   (nama atau daerah), panah atas/bawah, Enter. Pilihan disimpan di dataset.id;
+   mengetik ulang menghapus pilihan, jadi nama tidak pernah bisa "setengah cocok". */
+const MIN_CARI = 1;
+function comboPesertaHTML(id, ph){
+  return `<div class="combo" style="flex:1;max-width:460px">
+    <input class="field" id="${id}" autocomplete="off" role="combobox" aria-autocomplete="list"
+      aria-expanded="false" placeholder="${ph}"><div class="combo-pop" hidden></div></div>`;
+}
+function pasangComboPeserta(id, daftar, opsi){
+  const o = Object.assign({pra:null, ekstra:null, grupAtas:null}, opsi || {});
+  const input = $id(id); if(!input) return;
+  const pop = input.parentNode.querySelector('.combo-pop');
+  let hasil = [], aktif = -1;
+  const label = p => p.nama + ' — ' + p.daerah;
+  const setPilih = p => { input.dataset.id = p ? p.id : ''; input.value = p ? (p.id === '-' ? p.nama : label(p)) : ''; };
+  if(o.pra) setPilih(daftar.find(p => p.id === o.pra));
+
+  function cari(q){
+    const skor = p => {
+      const n = normal(p.nama), d = normal(p.daerah);
+      if(n.startsWith(q)) return 0;
+      if(n.split(' ').some(k => k.startsWith(q))) return 1;
+      if(n.includes(q)) return 2;
+      if(d.includes(q)) return 3;
+      return 9;
+    };
+    return daftar.map(p => [skor(p), p]).filter(x => x[0] < 9)
+      .sort((a,b)=> a[0]-b[0] || a[1].nama.localeCompare(b[1].nama,'id')).map(x => x[1]);
+  }
+  function tampil(){
+    const q = normal(input.value);
+    let html = '';
+    hasil = [];
+    if(q.length < MIN_CARI){
+      if(o.grupAtas && o.grupAtas.list.length){
+        hasil = o.grupAtas.list.slice();
+        html += `<div class="combo-grp">${esc(o.grupAtas.judul)}</div>`;
+      }
+      hasil.forEach((p,i)=>{ html += `<div class="combo-opt" data-i="${i}"><span class="cn">${esc(p.nama)}</span><span class="cp">${esc(p.daerah)}</span></div>`; });
+      html += `<div class="combo-empty">Ketik minimal ${MIN_CARI} huruf nama atau daerah.</div>`;
+    }else{
+      hasil = cari(q);
+      html += `<div class="combo-grp">${hasil.length} peserta cocok</div>`;
+      hasil.forEach((p,i)=>{ html += `<div class="combo-opt" data-i="${i}"><span class="cn">${sorot(p.nama,q)}</span><span class="cp">${sorot(p.daerah,q)}</span></div>`; });
+      if(!hasil.length) html += '<div class="combo-empty">Tidak ada peserta yang cocok.</div>';
+    }
+    if(o.ekstra){
+      hasil.push(o.ekstra);
+      html += `<div class="combo-opt" data-i="${hasil.length-1}"><span class="cn" style="font-weight:600;color:var(--text-dim)">${esc(o.ekstra.nama)}</span></div>`;
+    }
+    pop.innerHTML = html;
+    pop.hidden = false; input.setAttribute('aria-expanded','true');
+    aktif = (q.length >= MIN_CARI && hasil.length) ? 0 : -1;
+    tandai();
+  }
+  function tandai(){
+    pop.querySelectorAll('.combo-opt').forEach((el,i)=> el.classList.toggle('act', i === aktif));
+    const el = pop.querySelector('.combo-opt.act'); if(el) el.scrollIntoView({block:'nearest'});
+  }
+  function tutup(){ pop.hidden = true; input.setAttribute('aria-expanded','false'); }
+  function pilih(i){ const p = hasil[i]; if(!p) return; setPilih(p); tutup(); input.dispatchEvent(new Event('combo-pilih')); }
+
+  input.addEventListener('input', ()=>{ input.dataset.id = ''; tampil(); });
+  input.addEventListener('focus', ()=>{ if(!input.dataset.id) tampil(); else input.select(); });
+  input.addEventListener('blur', ()=> setTimeout(tutup, 150));
+  input.addEventListener('keydown', e=>{
+    if(e.key === 'ArrowDown' && pop.hidden){ e.preventDefault(); tampil(); return; }
+    if(e.key === 'ArrowDown'){ e.preventDefault(); aktif = Math.min(hasil.length-1, aktif+1); tandai(); }
+    else if(e.key === 'ArrowUp'){ e.preventDefault(); aktif = Math.max(0, aktif-1); tandai(); }
+    else if(e.key === 'Enter' && !pop.hidden && aktif >= 0){ e.preventDefault(); e.stopPropagation(); pilih(aktif); }
+    else if(e.key === 'Escape'){ tutup(); }
+  });
+  pop.addEventListener('mousedown', e=>{
+    const el = e.target.closest('.combo-opt');
+    if(el){ e.preventDefault(); pilih(+el.dataset.i); }
+  });
+}
+
+async function gambarQR(wadah, teks, ukuran){
+  if(!wadah) return;
+  if(!window.QRCode){ try{ await muatSkrip(QR_URL); }catch(e){} }
+  if(!window.QRCode){ wadah.textContent = 'QR butuh internet — ketik alamat di bawah secara manual.'; return; }
+  wadah.innerHTML = '';
+  new QRCode(wadah, {text:teks, width:ukuran, height:ukuran, colorDark:'#15182B', colorLight:'#ffffff',
+                     correctLevel:QRCode.CorrectLevel.M});
+}
+
+function unduhBlob(blob, nama){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nama; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+}
+
+
+/* ==================================================================
    BAGIAN H — LIGA INOVASI
    ------------------------------------------------------------------
    Lapisan gamifikasi DI ATAS alur forum. Alur angkat masalah →
@@ -3897,9 +4103,6 @@ pasangDikte('wiKesimpulan', 'micWi');
    ================================================================== */
 const LKEY = 'liga-inovasi-v1';
 const SKOR_MENANG = 3, SKOR_KALAH = -1;
-const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-const QR_URL   = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
 
 function ligaKosong(){
   return {versi:1,
@@ -3946,24 +4149,7 @@ function muatLiga(){
   }catch(e){}
   if(rapikanRoster()) simpanLiga();
 }
-const hariIni = () => new Date().toLocaleDateString('sv');   // YYYY-MM-DD waktu lokal
-const $id = id => document.getElementById(id);
 
-/* --- server lokal (server.py). Tanpa server, liga tetap jalan penuh
-       lewat input manual PTP; yang hilang hanya bid dari HP & arsip ke disk. --- */
-let ligaServer = null;           // null = belum dicek, false = tidak ada, objek = info server
-async function cekServer(){
-  try{
-    const j = await (await fetch('/api/info', {cache:'no-store'})).json();
-    ligaServer = j && j.ok ? j : false;
-  }catch(e){ ligaServer = false; }
-  return ligaServer;
-}
-async function api(jalur, data){
-  const r = await fetch(jalur, {method:'POST', headers:{'Content-Type':'application/json'},
-                                body:JSON.stringify(data)});
-  return r.json();
-}
 /* Alamat internet (terowongan cloudflared) didahulukan: HP bisa masuk dari
    jaringan apa pun. IP lokal hanya cadangan bila internet laptop mati.
    Laptop kantor sering punya VPN yang membuat tebakan IP pertama salah
@@ -4022,62 +4208,10 @@ function tampilArsip(){
 /* Roster panitia sering menulis "Jawa Barat", forum mencatat "Provinsi Jawa Barat".
    Awalan "Provinsi" diabaikan saat mencocokkan; "Kabupaten/Kota" TIDAK, karena
    Kota Bandung dan Kabupaten Bandung memang daerah berbeda. */
-const intiDaerah = s => normal(s).replace(/^provinsi\s+/, '');
-const samaDaerah = (a, b) => intiDaerah(a) === intiDaerah(b);
 let ligaGantiPemilik = null;     // id masalah yang pemiliknya sengaja dipilih manual
 function pesertaById(id){ return L.roster.find(p => p.id === id); }
 function namaPeserta(id){ const p = pesertaById(id); return p ? p.nama : '(dihapus)'; }
 
-/* STANDAR NAMA DAERAH ROSTER — daerah peserta diseragamkan ke nama wilayah
-   resmi (WILAYAH, Kepmendagri) yang juga dipakai kolom daerah di forum. Tanpa
-   ini "Jawa Barat" di Excel panitia tidak pernah cocok dengan "Provinsi Jawa
-   Barat" di forum: pemilik masalah tidak terisi otomatis dan tanggapan tidak
-   tertaut ke bid. Urutan percobaan:
-     1. nama resmi persis            "Kabupaten Sleman"
-     2. singkatan umum               "Kab. Sleman", "Pemkot Medan", "DKI Jakarta"
-     3. nama provinsi tanpa awalan   "Jawa Barat" → "Provinsi Jawa Barat"
-     4. nama inti yang unik          "Sleman" → "Kabupaten Sleman"
-   Nama yang ambigu ("Bandung": kota/kabupaten) atau tidak dikenal dibiarkan
-   apa adanya dan ditandai di tabel peserta supaya PTP membetulkannya. */
-const ALIAS_DAERAH = {
-  'dki jakarta':'Provinsi Daerah Khusus Ibukota Jakarta', 'jakarta':'Provinsi Daerah Khusus Ibukota Jakarta',
-  'dki':'Provinsi Daerah Khusus Ibukota Jakarta',
-  'di yogyakarta':'Provinsi Daerah Istimewa Yogyakarta', 'diy':'Provinsi Daerah Istimewa Yogyakarta',
-  'yogyakarta':'Provinsi Daerah Istimewa Yogyakarta', 'jogja':'Provinsi Daerah Istimewa Yogyakarta',
-  'bangka belitung':'Provinsi Kepulauan Bangka Belitung', 'babel':'Provinsi Kepulauan Bangka Belitung',
-  'kep. bangka belitung':'Provinsi Kepulauan Bangka Belitung',
-  'kepri':'Provinsi Kepulauan Riau', 'kep. riau':'Provinsi Kepulauan Riau',
-  'ntb':'Provinsi Nusa Tenggara Barat', 'ntt':'Provinsi Nusa Tenggara Timur',
-  'sumut':'Provinsi Sumatera Utara', 'sumbar':'Provinsi Sumatera Barat', 'sumsel':'Provinsi Sumatera Selatan',
-  'jabar':'Provinsi Jawa Barat', 'jateng':'Provinsi Jawa Tengah', 'jatim':'Provinsi Jawa Timur',
-  'kalbar':'Provinsi Kalimantan Barat', 'kalteng':'Provinsi Kalimantan Tengah', 'kalsel':'Provinsi Kalimantan Selatan',
-  'kaltim':'Provinsi Kalimantan Timur', 'kaltara':'Provinsi Kalimantan Utara',
-  'sulut':'Provinsi Sulawesi Utara', 'sulteng':'Provinsi Sulawesi Tengah', 'sulsel':'Provinsi Sulawesi Selatan',
-  'sultra':'Provinsi Sulawesi Tenggara', 'sulbar':'Provinsi Sulawesi Barat', 'malut':'Provinsi Maluku Utara'
-};
-function kanonDaerah(s){
-  let t = rapi(String(s || ''));
-  if(!t) return t;
-  t = t.replace(/^(kab\.?|pemkab\.?)\s+/i, 'Kabupaten ')
-       .replace(/^(pemkot\.?)\s+/i, 'Kota ')
-       .replace(/^(prov\.?|pemprov\.?)\s+/i, 'Provinsi ');
-  const k = t.toLowerCase();
-  const persis = WILAYAH.find(x => x.n.toLowerCase() === k);
-  if(persis) return persis.n;
-  const alias = ALIAS_DAERAH[k.replace(/^provinsi\s+/, '')];
-  if(alias) return alias;
-  // Nama inti dicocokkan tanpa "Administrasi" (wilayah DKI). Provinsi ikut di daftar
-  // ini, jadi "Jawa Barat" tetap unik, sedangkan "Jambi"/"Bengkulu"/"Gorontalo"
-  // (provinsi sekaligus kota) dibiarkan ambigu — dulu diam-diam dianggap provinsi.
-  const tanpaAdm = c => c.replace(/^administrasi\s+/, '');
-  const jenis = (k.match(/^(kota|kabupaten)\s+/) || [])[1];
-  const kunci = jenis ? k.slice(jenis.length + 1) : k;
-  const inti = WILAYAH.filter(x => (x.c === kunci || tanpaAdm(x.c) === kunci)
-    && (!jenis || x.n.toLowerCase().startsWith(jenis + ' ')));
-  if(inti.length === 1) return inti[0].n;
-  return t;
-}
-const daerahStandar = d => WILAYAH_SET.has(String(d || '').toLowerCase());
 
 /* Roster lama (sebelum standar ini) dirapikan sekali saat dimuat. ID peserta
    tidak berubah, jadi bid dan skor tetap utuh. */
@@ -4101,11 +4235,6 @@ function barisKeRoster(rows){
   return rows.map(r => ({nama:r[iN] || '', daerah:kanonDaerah(r[iD] || '')})).filter(p => p.nama);
 }
 
-function teksKeBaris(t){
-  const baris = t.replace(/^﻿/, '').split(/\r?\n/);
-  const pem = /\t/.test(t) ? '\t' : (/;/.test(baris[0]) ? ';' : ',');
-  return baris.map(b => b.split(pem).map(c => c.replace(/^"(.*)"$/, '$1')));
-}
 
 /* Gabung, bukan timpa: peserta yang sudah punya bid tidak boleh hilang
    (poinnya akan yatim). Nama yang sama → id dipertahankan, daerah diperbarui. */
@@ -4126,25 +4255,6 @@ function terapkanRoster(baru){
         + (asing ? ' ' + asing + ' nama daerah tidak dikenal — lihat tanda merah.' : ''));
 }
 
-function muatSkrip(src){
-  return new Promise((ok, gagal)=>{
-    const s = document.createElement('script');
-    s.src = src; s.onload = ok; s.onerror = ()=> gagal(new Error('gagal memuat ' + src));
-    document.head.appendChild(s);
-  });
-}
-async function pastikanXLSX(){
-  if(window.XLSX) return true;
-  try{ await muatSkrip(XLSX_URL); }catch(e){}
-  return !!window.XLSX;
-}
-// pemuatan awal (defer) bisa gagal bila internet kelas baru menyala belakangan — dicoba lagi saat dibutuhkan
-async function pastikanPDF(){
-  if(window.jspdf) return true;
-  try{ await muatSkrip(JSPDF_URL); }catch(e){}
-  if(!window.jspdf) toast('Library PDF gagal dimuat — periksa koneksi internet, lalu klik lagi.');
-  return !!window.jspdf;
-}
 
 async function imporRoster(f){
   try{
@@ -4502,84 +4612,6 @@ function ligaHapusMasalah(mid){
 }
 
 /* --- render: kartu liga di layar tanggapan --- */
-/* Kolom cari peserta — pola sama dengan combobox daerah: ketik minimal 1 huruf
-   (nama atau daerah), panah atas/bawah, Enter. Pilihan disimpan di dataset.id;
-   mengetik ulang menghapus pilihan, jadi nama tidak pernah bisa "setengah cocok". */
-const MIN_CARI = 1;
-function comboPesertaHTML(id, ph){
-  return `<div class="combo" style="flex:1;max-width:460px">
-    <input class="field" id="${id}" autocomplete="off" role="combobox" aria-autocomplete="list"
-      aria-expanded="false" placeholder="${ph}"><div class="combo-pop" hidden></div></div>`;
-}
-function pasangComboPeserta(id, daftar, opsi){
-  const o = Object.assign({pra:null, ekstra:null, grupAtas:null}, opsi || {});
-  const input = $id(id); if(!input) return;
-  const pop = input.parentNode.querySelector('.combo-pop');
-  let hasil = [], aktif = -1;
-  const label = p => p.nama + ' — ' + p.daerah;
-  const setPilih = p => { input.dataset.id = p ? p.id : ''; input.value = p ? (p.id === '-' ? p.nama : label(p)) : ''; };
-  if(o.pra) setPilih(daftar.find(p => p.id === o.pra));
-
-  function cari(q){
-    const skor = p => {
-      const n = normal(p.nama), d = normal(p.daerah);
-      if(n.startsWith(q)) return 0;
-      if(n.split(' ').some(k => k.startsWith(q))) return 1;
-      if(n.includes(q)) return 2;
-      if(d.includes(q)) return 3;
-      return 9;
-    };
-    return daftar.map(p => [skor(p), p]).filter(x => x[0] < 9)
-      .sort((a,b)=> a[0]-b[0] || a[1].nama.localeCompare(b[1].nama,'id')).map(x => x[1]);
-  }
-  function tampil(){
-    const q = normal(input.value);
-    let html = '';
-    hasil = [];
-    if(q.length < MIN_CARI){
-      if(o.grupAtas && o.grupAtas.list.length){
-        hasil = o.grupAtas.list.slice();
-        html += `<div class="combo-grp">${esc(o.grupAtas.judul)}</div>`;
-      }
-      hasil.forEach((p,i)=>{ html += `<div class="combo-opt" data-i="${i}"><span class="cn">${esc(p.nama)}</span><span class="cp">${esc(p.daerah)}</span></div>`; });
-      html += `<div class="combo-empty">Ketik minimal ${MIN_CARI} huruf nama atau daerah.</div>`;
-    }else{
-      hasil = cari(q);
-      html += `<div class="combo-grp">${hasil.length} peserta cocok</div>`;
-      hasil.forEach((p,i)=>{ html += `<div class="combo-opt" data-i="${i}"><span class="cn">${sorot(p.nama,q)}</span><span class="cp">${sorot(p.daerah,q)}</span></div>`; });
-      if(!hasil.length) html += '<div class="combo-empty">Tidak ada peserta yang cocok.</div>';
-    }
-    if(o.ekstra){
-      hasil.push(o.ekstra);
-      html += `<div class="combo-opt" data-i="${hasil.length-1}"><span class="cn" style="font-weight:600;color:var(--text-dim)">${esc(o.ekstra.nama)}</span></div>`;
-    }
-    pop.innerHTML = html;
-    pop.hidden = false; input.setAttribute('aria-expanded','true');
-    aktif = (q.length >= MIN_CARI && hasil.length) ? 0 : -1;
-    tandai();
-  }
-  function tandai(){
-    pop.querySelectorAll('.combo-opt').forEach((el,i)=> el.classList.toggle('act', i === aktif));
-    const el = pop.querySelector('.combo-opt.act'); if(el) el.scrollIntoView({block:'nearest'});
-  }
-  function tutup(){ pop.hidden = true; input.setAttribute('aria-expanded','false'); }
-  function pilih(i){ const p = hasil[i]; if(!p) return; setPilih(p); tutup(); input.dispatchEvent(new Event('combo-pilih')); }
-
-  input.addEventListener('input', ()=>{ input.dataset.id = ''; tampil(); });
-  input.addEventListener('focus', ()=>{ if(!input.dataset.id) tampil(); else input.select(); });
-  input.addEventListener('blur', ()=> setTimeout(tutup, 150));
-  input.addEventListener('keydown', e=>{
-    if(e.key === 'ArrowDown' && pop.hidden){ e.preventDefault(); tampil(); return; }
-    if(e.key === 'ArrowDown'){ e.preventDefault(); aktif = Math.min(hasil.length-1, aktif+1); tandai(); }
-    else if(e.key === 'ArrowUp'){ e.preventDefault(); aktif = Math.max(0, aktif-1); tandai(); }
-    else if(e.key === 'Enter' && !pop.hidden && aktif >= 0){ e.preventDefault(); e.stopPropagation(); pilih(aktif); }
-    else if(e.key === 'Escape'){ tutup(); }
-  });
-  pop.addEventListener('mousedown', e=>{
-    const el = e.target.closest('.combo-opt');
-    if(el){ e.preventDefault(); pilih(+el.dataset.i); }
-  });
-}
 
 function renderLigaTg(){
   const el = $id('ligaTg'); if(!el) return;
@@ -4766,14 +4798,6 @@ function renderDaftarBid(){
   }).join('');
 }
 
-async function gambarQR(wadah, teks, ukuran){
-  if(!wadah) return;
-  if(!window.QRCode){ try{ await muatSkrip(QR_URL); }catch(e){} }
-  if(!window.QRCode){ wadah.textContent = 'QR butuh internet — ketik alamat di bawah secara manual.'; return; }
-  wadah.innerHTML = '';
-  new QRCode(wadah, {text:teks, width:ukuran, height:ukuran, colorDark:'#15182B', colorLight:'#ffffff',
-                     correctLevel:QRCode.CorrectLevel.M});
-}
 function qrBesar(){
   const url = urlBid(); if(!url) return;
   const p = putaranTerbuka();
@@ -5001,11 +5025,6 @@ function tabelEkspor(){
   return {ringkas, peringkat, bid, roster};
 }
 
-function unduhBlob(blob, nama){
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = nama; a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
-}
 
 async function eksporExcel(){
   if(!L.roster.length) return toast('Belum ada data liga untuk diekspor.');
