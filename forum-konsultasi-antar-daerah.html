@@ -6164,21 +6164,39 @@ const zoomStr = z => `translate(${z.tx.toFixed(2)},${z.ty.toFixed(2)}) scale(${z
 const zoomSama = (a, b) => Math.abs(a.tx - b.tx) < .5 && Math.abs(a.ty - b.ty) < .5 && Math.abs(a.skala - b.skala) < .01;
 /* Digambar lewat requestAnimationFrame (bukan CSS transition) supaya jalan
    konsisten walau atribut transform SVG-nya diubah lewat JS, bukan style. */
-function animasiZoomPeta(g, dari, ke, durasi){
-  if(matchMedia('(prefers-reduced-motion:reduce)').matches){ g.setAttribute('transform', zoomStr(ke)); return; }
+function animasiZoomPeta(g, dari, ke, durasi, terapkanUkuran){
+  const pasang = z => { g.setAttribute('transform', zoomStr(z)); if(terapkanUkuran) terapkanUkuran(z.skala); };
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches){ pasang(ke); return; }
   const t0 = performance.now();
   const ease = t => 1 - Math.pow(1 - t, 3);
   (function langkah(now){
     if(!g.isConnected) return;
     const t = Math.min(1, (now - t0) / durasi), e = ease(t);
-    g.setAttribute('transform', zoomStr({
+    pasang({
       tx: dari.tx + (ke.tx - dari.tx) * e,
       ty: dari.ty + (ke.ty - dari.ty) * e,
       skala: dari.skala + (ke.skala - dari.skala) * e
-    }));
+    });
     if(t < 1) requestAnimationFrame(langkah);
   })(t0);
 }
+
+/* UKURAN TITIK OTOMATIS — titik dan garis menyesuaikan kepadatan yang TERLIHAT di layar.
+   Acuannya jarak antar-titik terdekat (persentil ke-25, jadi gerombolan padat yang
+   menentukan) dikali skala zoom saat itu. Jarak = JARAK_LEGA satuan peta → ukuran dasar (1);
+   makin rapat makin kecil (minimal 40%), makin lega makin besar (maksimal 135%). Dihitung
+   ulang tiap render (daerah bertambah) dan tiap bingkai animasi zoom, jadi ukuran bergerak
+   mulus bersama zoom, tak pernah melompat. */
+const JARAK_LEGA = 7;
+function jarakRapatTitik(titik){
+  const p = [...titik.values()];
+  if(p.length < 10) return Infinity;   // titik sedikit tak perlu dikecilkan — pisahkanTitikBerdempetan cukup
+  const d = p.map((a, i) => { let m = Infinity; p.forEach((b, k)=>{ if(k !== i){ const h = Math.hypot(a.x - b.x, a.y - b.y); if(h < m) m = h; } }); return m; }).sort((x, y)=> x - y);
+  return Math.max(.5, d[Math.floor(d.length / 4)]);
+}
+const faktorUkuranPeta = (jarak, skala) => Math.max(.4, Math.min(1.35, jarak * skala / JARAK_LEGA));
+// garis (busur) tidak ikut membesar, hanya ikut mengecil saat rapat
+const faktorGarisPeta = (jarak, skala) => Math.max(.55, Math.min(1, faktorUkuranPeta(jarak, skala)));
 
 /* opt:
      sorotHost   nama daerah pengangkat yang disorot (klik titik di dashboard)
@@ -6200,18 +6218,32 @@ function renderPeta(box, opt){
   const titik = new Map();
   daerah.forEach((v, n)=>{ const t = titikPeta(n); if(t) titik.set(n, {x:t[0], y:t[1], v}); else tanpaTitik.push(n); });
 
+  /* Zoom & ukuran titik dihitung SEBELUM menggambar, dari posisi asli (belum digeser):
+     saat peta diperbesar, titik & tulisan digambar lebih kecil di koordinat peta supaya
+     di layar tetap proporsional (tulisan tidak membengkak, lebih banyak nama muat). */
+  const zoomSasaran = zoomPetaSasaran(titik);
+  const zoomPertama = !box._zoomTerakhir;
+  const zoomAwal = zoomPertama ? ZOOM_UTUH : box._zoomTerakhir;
+  const sk = zoomSasaran.skala, u = 1 / sk;
+  const jarak = jarakRapatTitik(titik);
+  const fAkhir = faktorUkuranPeta(jarak, sk);
+  // ukuran dasar (satuan peta, pada skala 1) → ukuran yang digambar pada skala s
+  const ukur = (dasar, s) => (dasar * faktorUkuranPeta(jarak, s) / s).toFixed(2);
+  const sAwal = zoomAwal.skala;
+
   // daerah yang ibu kotanya berdempetan (mis. Kab. & Kota Semarang) titiknya
   // nyaris menumpuk di peta — digeser tipis biar lingkaran kecil tidak
   // "nyembul" dari lingkaran besar di sebelahnya alih-alih tertutup rapi.
+  // Jari-jari yang dipakai = jari-jari yang benar-benar digambar pada zoom sasaran.
   (function pisahkanTitikBerdempetan(){
-    const jariJari = v => v.angkat ? 4 + Math.min(4, v.angkat * 1.2) : 2.6 + Math.min(2.4, v.tanggap * .6);
+    const jariJari = v => (v.angkat ? 4 + Math.min(4, v.angkat * 1.2) : 2.6 + Math.min(2.4, v.tanggap * .6)) * fAkhir / sk;
     const daftar = [...titik.values()];
     for(let putaran = 0; putaran < 3; putaran++){
       for(let a = 0; a < daftar.length; a++){
         for(let b = a + 1; b < daftar.length; b++){
           const pa = daftar[a], pb = daftar[b];
           let dx = pb.x - pa.x, dy = pb.y - pa.y, d = Math.hypot(dx, dy);
-          const batas = jariJari(pa.v) + jariJari(pb.v) + 1;
+          const batas = jariJari(pa.v) + jariJari(pb.v) + u;
           if(d >= batas) continue;
           if(d < .01){ const sudut = a * 2.4; dx = Math.cos(sudut); dy = Math.sin(sudut); d = 1; }
           const geser = (batas - d) / 2, ux = dx / d, uy = dy / d;
@@ -6221,12 +6253,6 @@ function renderPeta(box, opt){
       }
     }
   })();
-
-  /* Zoom dihitung SEBELUM menggambar: saat peta diperbesar, titik & tulisan digambar
-     lebih kecil di koordinat peta supaya di layar tetap proporsional (tulisan tidak
-     membengkak, dan lebih banyak nama muat tanpa saling menimpa). */
-  const zoomSasaran = zoomPetaSasaran(titik);
-  const sk = zoomSasaran.skala, u = 1 / sk, kd = 1 / Math.pow(sk, .6);
 
   // relasi berarah: penanggap → pengangkat
   const relasi = new Map();
@@ -6242,6 +6268,8 @@ function renderPeta(box, opt){
   const adaSorot = [...relasi.values()].some(r => r.sorot) || !!o.sorotMasalah;
 
   let busur = '', komet = '', j = 0;
+  // makin banyak busur makin transparan, supaya tumpukannya tidak jadi gumpalan biru pekat
+  const opArc = Math.max(.14, Math.min(.5, .5 * Math.sqrt(60 / Math.max(1, relasi.size)))).toFixed(2);
   const jeda = o.urut ? Math.min(160, 2600 / Math.max(1, relasi.size)) : 0;
   relasi.forEach((r, k)=>{
     const A = titik.get(r.a), B = titik.get(r.b);
@@ -6254,12 +6282,13 @@ function renderPeta(box, opt){
     const id = uid + '-b' + j;
     const lama = sudah.has(k) && !o.urut;
     const kls = (r.sorot ? ' pt-sorot' : adaSorot ? ' pt-redup' : '') + (lama ? ' pt-langsung' : '');
-    busur += `<path id="${id}" pathLength="1" class="pt-busur${kls}" d="M${A.x} ${A.y}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${B.x} ${B.y}"
-      style="stroke-width:${(r.sorot ? 2.2 : Math.min(3, 1 + r.bobot * .5)).toFixed(1)};animation-delay:${o.urut ? j * jeda : 0}ms"/>`;
+    const lebarDasar = r.sorot ? 2.2 : Math.min(3, 1 + r.bobot * .5);
+    busur += `<path id="${id}" pathLength="1" class="pt-busur${kls}" d="M${A.x} ${A.y}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${B.x} ${B.y}" data-w="${lebarDasar.toFixed(1)}"
+      style="stroke-width:${(lebarDasar * faktorGarisPeta(jarak, sAwal) / sAwal).toFixed(2)};animation-delay:${o.urut ? j * jeda : 0}ms${(!r.sorot && !adaSorot) ? ';opacity:' + opArc : ''}"/>`;
     // "komet" = praktik yang sedang mengalir. Dibatasi supaya tetap ringan di laptop kelas.
     if(j < 90 && (!adaSorot || r.sorot)){
       const dur = (2.4 + d / 170).toFixed(2), mulai = ((o.urut ? j * jeda + 900 : 0) / 1000 + (j % 7) * .37).toFixed(2);
-      komet += `<circle r="${((r.sorot ? 3.2 : 2.3) * kd).toFixed(2)}" class="pt-komet${r.sorot ? ' pt-sorot' : ''}${lama ? ' pt-langsung' : ''}"
+      komet += `<circle r="${ukur(r.sorot ? 3.2 : 2.3, sAwal)}" data-r="${r.sorot ? 3.2 : 2.3}" class="pt-komet${r.sorot ? ' pt-sorot' : ''}${lama ? ' pt-langsung' : ''}"
         style="animation-delay:${mulai}s"><animateMotion dur="${dur}s" begin="${mulai}s" repeatCount="indefinite"><mpath href="#${id}"/></animateMotion></circle>`;
     }
     sudah.add(k); j++;
@@ -6274,12 +6303,12 @@ function renderPeta(box, opt){
     const tunda = `animation-delay:${o.urut ? i * urutJeda : 0}ms`;
     if(p.v.angkat){
       const s = (o.sorotHost === n) || (o.sorotMasalah && cari(o.sorotMasalah) && cari(o.sorotMasalah).daerah.trim() === n);
-      const r = (4 + Math.min(4, p.v.angkat * 1.2)) * kd;
-      host += `<circle class="pt-denyut${s ? ' pt-sorot' : ''}" cx="${p.x}" cy="${p.y}" r="${r}" style="animation-delay:${(i % 9) * .3}s"/>
-        <circle class="pt-host${o.klik ? ' pt-klik' : ''}${lama ? ' pt-langsung' : ''}" cx="${p.x}" cy="${p.y}" r="${r}" style="${tunda}${s ? ';fill:var(--liga)' : ''}"
+      const r = 4 + Math.min(4, p.v.angkat * 1.2);
+      host += `<circle class="pt-denyut${s ? ' pt-sorot' : ''}" cx="${p.x}" cy="${p.y}" r="${ukur(r, sAwal)}" data-r="${r}" style="animation-delay:${(i % 9) * .3}s"/>
+        <circle class="pt-host${o.klik ? ' pt-klik' : ''}${lama ? ' pt-langsung' : ''}" cx="${p.x}" cy="${p.y}" r="${ukur(r, sAwal)}" data-r="${r}" style="${tunda}${s ? ';fill:var(--liga)' : ''}"
           ${o.klik ? `data-nama="${esc(n)}"` : ''}><title>${esc(n)}</title></circle>`;
     }else{
-      tamu += `<circle class="pt-tamu${lama ? ' pt-langsung' : ''}" cx="${p.x}" cy="${p.y}" r="${((2.6 + Math.min(2.4, p.v.tanggap * .6)) * kd).toFixed(2)}" style="${tunda}"><title>${esc(n)}</title></circle>`;
+      tamu += `<circle class="pt-tamu${lama ? ' pt-langsung' : ''}" cx="${p.x}" cy="${p.y}" r="${ukur(2.6 + Math.min(2.4, p.v.tanggap * .6), sAwal)}" data-r="${(2.6 + Math.min(2.4, p.v.tanggap * .6)).toFixed(2)}" style="${tunda}"><title>${esc(n)}</title></circle>`;
     }
     sudah.add('@' + n); i++;
   });
@@ -6296,7 +6325,7 @@ function renderPeta(box, opt){
     const s = n === o.sorotHost || (o.sorotMasalah && cari(o.sorotMasalah) && cari(o.sorotMasalah).daerah.trim() === n);
     // tempat pas di sebelah titik dicoba dulu; kalau semua nabrak (titik lagi rapat),
     // geser ke diagonal atas/bawah dengan garis penunjuk tipis supaya nama tetap kebaca.
-    const g9 = 9 * kd, g8 = 8 * u, g14 = 14 * u;   // g9 mengikuti jari-jari titik yang ikut mengecil
+    const g9 = (8 * fAkhir + 1.2) * u, g8 = 8 * u, g14 = 14 * u;   // g9 = jari-jari titik terbesar + sela
     const posisi = [
       [p.x + g9, p.y, 'start', false], [p.x - g9, p.y, 'end', false],
       [p.x + g8, p.y - g14, 'start', true], [p.x - g8, p.y - g14, 'end', true],
@@ -6315,9 +6344,6 @@ function renderPeta(box, opt){
     }
   });
 
-  const zoomPertama = !box._zoomTerakhir;
-  const zoomAwal = zoomPertama ? ZOOM_UTUH : box._zoomTerakhir;
-
   box._sudah = sudah;
   box.innerHTML = `<svg viewBox="0 0 ${PETA_W} ${PETA_H}" role="img" aria-label="Peta jejaring ${titik.size} daerah">
       <g class="pt-zoom" transform="${zoomStr(zoomAwal)}">
@@ -6332,7 +6358,13 @@ function renderPeta(box, opt){
   // dari awal saat pertama kali render; sesudahnya cuma geser/skala kalau sasarannya berubah.
   if(!zoomSama(zoomSasaran, zoomAwal)){
     const g = box.querySelector('.pt-zoom');
-    setTimeout(()=> animasiZoomPeta(g, zoomAwal, zoomSasaran, 1050), zoomPertama ? (o.urut ? 1800 : 900) : 0);
+    // ukuran titik & garis ikut diperbarui tiap bingkai zoom (lihat faktorUkuranPeta)
+    const terapkanUkuran = s => {
+      const f = faktorUkuranPeta(jarak, s), fl = faktorGarisPeta(jarak, s);
+      g.querySelectorAll('[data-r]').forEach(e => e.setAttribute('r', (e.dataset.r * f / s).toFixed(2)));
+      g.querySelectorAll('[data-w]').forEach(e => { e.style.strokeWidth = (e.dataset.w * fl / s).toFixed(2); });
+    };
+    setTimeout(()=> animasiZoomPeta(g, zoomAwal, zoomSasaran, 1050, terapkanUkuran), zoomPertama ? (o.urut ? 1800 : 900) : 0);
   }
   box._zoomTerakhir = zoomSasaran;
 }
