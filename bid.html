@@ -28,7 +28,9 @@
 ::-webkit-scrollbar-thumb:hover{background:var(--text-dim);background-clip:content-box}
 ::-webkit-scrollbar-corner{background:transparent}
 body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;
-  padding:22px 16px 40px;-webkit-font-smoothing:antialiased}
+  padding:22px 16px 40px;-webkit-font-smoothing:antialiased;
+  -webkit-user-select:none;user-select:none}
+input,textarea,select,[contenteditable="true"]{-webkit-user-select:text;user-select:text}
 .wrap{max-width:520px;margin:0 auto}
 .kick{font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
 h1{font-size:24px;letter-spacing:-.02em;margin:6px 0 18px}
