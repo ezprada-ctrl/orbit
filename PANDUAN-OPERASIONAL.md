@@ -286,7 +286,7 @@ Kendali otomatis kembali ke PTP. Siap untuk masalah berikutnya.
 | Terlanjur keluar dari pembahasan | Di dashboard, tombol biru **"Lanjutkan: (judul masalah) →"** ada paling atas, tepat di bawah angka |
 | Tersesat di layar mana pun | Tombol **"Dashboard"** selalu ada di pojok kanan atas |
 | WI terlanjur masuk tapi belum siap | Klik **PTP** di saklar. Draf yang sudah diketik tidak hilang |
-| Browser ter-refresh / laptop hang di tengah pembahasan | Buka lagi. Aplikasi langsung kembali ke pembahasan yang sedang berjalan; draf kesimpulan WI yang sedang diketik ikut tersimpan |
+| Browser ter-refresh / laptop hang di tengah pembahasan | Buka lagi. Aplikasi selalu dibuka di layar pembuka; klik **Lanjutkan Sesi Terakhir** untuk langsung kembali ke pembahasan yang sedang berjalan (draf kesimpulan WI yang sedang diketik ikut tersimpan) |
 | Lupa klik **Catat** lalu langsung alihkan ke WI | Aplikasi menahan dan bertanya — jawab **OK** supaya tanggapan itu ikut tercatat sebelum WI menyimpulkan |
 | PDF gagal diunduh karena internet sempat mati | Nyalakan internet, klik tombol PDF lagi — tidak perlu muat ulang halaman |
 

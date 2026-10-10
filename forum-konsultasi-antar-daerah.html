@@ -886,6 +886,12 @@ body.mode-standar #panggungBtn{display:none}
 .lg-waktu .btn{padding:6px 12px;font-size:13px}
 .lg-waktu .btn.on{border-color:var(--liga);color:var(--liga)}
 .lg-waktu b{color:var(--liga);font-variant-numeric:tabular-nums;font-size:15px}
+.lg-sisa-besar{margin:0 0 14px;font-size:44px;font-weight:700;letter-spacing:-.02em;line-height:1;color:var(--liga);font-variant-numeric:tabular-nums}
+.lg-sisa-besar:empty{display:none}
+.lg-sisa-besar small{display:block;margin-top:6px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-dim)}
+.lg-sisa-besar.kritis,.lg-sisa-besar.habis{color:var(--danger)}
+.lg-sisa-besar.kritis{animation:detak 1s ease-in-out infinite}
+.lg-sisa-besar.habis{font-size:34px}
 
 /* ============================================================
    LAYAR PANGGUNG — jendela kedua khusus proyektor. Kanvas tetap
@@ -1246,6 +1252,8 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
         <p class="lead">Sistem yang mencatat, merapikan, dan menyusun hasil diskusi menjadi data siap olah.</p>
         <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
           <button class="btn btn-primary btn-lg" onclick="mulaiSesi()">Mulai Sesi &nbsp;→</button>
+          <button class="btn btn-lg btn-ghost" id="btnLanjut" style="display:none;color:var(--accent);border-color:var(--accent)"
+            onclick="lanjutkanSesiTerakhir()">↩ Lanjutkan Sesi Terakhir</button>
           <button class="btn btn-ghost" onclick="cekSiapKelas()">Cek Siap Kelas</button>
           <button class="btn btn-ghost" onclick="muatContoh(12,50)"
             title="Isi aplikasi dengan sesi contoh untuk melihat tampilannya saat penuh">
@@ -1256,6 +1264,7 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
             Contoh · Satu Pulau
           </button>
         </div>
+        <p id="lanjutInfo" style="display:none;font-size:13.5px;color:var(--accent);margin-top:14px;font-weight:700"></p>
         <p style="font-size:13.5px;color:var(--text-dim);margin-top:14px;font-weight:600">
           Contoh berisi 12 masalah dari 12 daerah dan 54 tanggapan dari 50 daerah lain —
           untuk gladi bersih atau mengecek tampilan sebelum kelas.
@@ -1918,7 +1927,8 @@ async function pulihkanBerkas(){
       if(s.masalah.length || !S.masalah.length){
         S = s; prevStats = {m:0,d:0,t:0};
         simpan(); setMode('PTP');
-        if(S.masalah.length) go('dash');
+        // dari layar pembuka tetap di layar pembuka — sesi dilanjutkan lewat tombolnya
+        if(S.masalah.length && layarSekarang !== 'welcome') go('dash');
       }
     }
     terakhirTulis = new Date();
@@ -1976,11 +1986,23 @@ const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':
    ================================================================== */
 let layarSekarang = 'welcome';
 
+/* Layar terakhir diingat supaya bisa dilanjutkan lewat tombol di layar pembuka.
+   Aplikasi SELALU dibuka di layar pembuka (lihat init) — apa pun sesi terakhirnya. */
+const LAYAR_KEY = 'orbit-layar-terakhir';
+function ingatLayar(nama){
+  if(typeof PANGGUNG !== 'undefined' && PANGGUNG) return;
+  try{
+    localStorage.setItem(LAYAR_KEY, JSON.stringify({layar:nama, mode:modeApp, liga:ligaTabAktif, std:stdTabAktif, aktifId:S.aktifId || null}));
+    localStorage.setItem(MKEY, modeApp);
+  }catch(e){}
+}
+
 function go(nama){
   hentikanDikte();   // mikrofon tidak boleh terus hidup setelah pindah layar
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('scr-'+nama).classList.add('active');
   layarSekarang = nama;
+  if(nama !== 'welcome') ingatLayar(nama);
   window.scrollTo({top:0, behavior:'smooth'});
   if(nama==='dash') renderDashboard();
   if(nama==='rekap') renderRekap();
@@ -2037,6 +2059,50 @@ function pilihMode(mode){
 }
 
 function mulaiSesi(){ setMode('PTP'); go('dash'); }
+
+/* Tombol "Lanjutkan Sesi Terakhir" di layar pembuka: loncat langsung ke layar tempat
+   sesi terakhir ditinggalkan (dashboard, pembahasan yang berjalan, rekap, Liga, atau
+   Mode Standar). Hanya muncul bila memang ada sesi dengan isi. */
+function layarLanjut(){
+  let r = null;
+  try{ r = JSON.parse(localStorage.getItem(LAYAR_KEY)); }catch(e){}
+  if(!r || !r.layar){   // pengguna lama: belum ada catatan layar — turunkan dari mode tersimpan
+    let std = false; try{ std = localStorage.getItem(MKEY) === 'standar'; }catch(e){}
+    r = {layar: std ? 'std' : 'dash', mode: std ? 'standar' : 'gamifikasi', aktifId: S.aktifId};
+  }
+  if(r.mode === 'standar'){
+    const s = N.sesi.find(x => x.id === N.aktifId) || N.sesi[0];
+    if(!s || (!s.entri.length && !s.peserta.length && !s.judul.trim())) return null;
+    return {mode:'standar', std:r.std, info:'Notulen · ' + (s.judul.trim() || 'Sesi tanpa judul') + ' · ' + s.entri.length + ' catatan'};
+  }
+  if(!S.masalah.length) return null;
+  const aktif = cari(r.aktifId);
+  const berjalan = !!(aktif && sedangBerjalan(aktif));
+  let layar = r.layar;
+  if(layar === 'wi' || layar === 'masalah' || (layar === 'tanggapan' && !berjalan)) layar = berjalan ? 'tanggapan' : 'dash';
+  if(!['dash', 'tanggapan', 'rekap', 'tutup', 'liga'].includes(layar)) layar = 'dash';
+  const nama = {dash:'Dashboard', rekap:'Rekap Sesi', tutup:'Penutupan Sesi', liga:'Liga Inovasi',
+                tanggapan:'Pembahasan · ' + (aktif ? aktif.judul : '')}[layar];
+  return {mode:'gamifikasi', layar, liga:r.liga, aktifId:berjalan ? aktif.id : null,
+          info:nama + ' · ' + S.masalah.length + ' masalah'};
+}
+function siapkanLanjut(){
+  const l = layarLanjut();
+  const b = $id('btnLanjut'), i = $id('lanjutInfo');
+  if(!b || !i) return;
+  b.style.display = l ? '' : 'none';
+  i.style.display = l ? '' : 'none';
+  if(l) i.textContent = 'Terakhir: ' + l.info;
+}
+function lanjutkanSesiTerakhir(){
+  const l = layarLanjut();
+  if(!l){ toast('Belum ada sesi sebelumnya untuk dilanjutkan.'); return; }
+  if(l.mode === 'standar'){ if(l.std) stdTabAktif = l.std === 'cari' ? 'catat' : l.std; terapkanModeApp('standar'); return; }
+  setMode('PTP');
+  if(l.layar === 'liga'){ ligaTabAktif = l.liga || 'papan'; go('liga'); return; }
+  if(l.layar === 'tanggapan'){ S.aktifId = l.aktifId; simpan(); go('tanggapan'); renderTanggapan(); return; }
+  go(l.layar);
+}
 
 /* Menolak simpan sambil MENUNJUK kolomnya: disoroti, digulirkan ke tengah
    layar, lalu difokuskan. Pesannya juga menyebut kolom mana yang kurang,
@@ -4909,6 +4975,7 @@ function qrBesar(){
     <div style="text-align:center">
       <div class="lg-kick">Liga Inovasi · Kirim Bid dari HP</div>
       <h2 style="font-size:28px;letter-spacing:-.02em;margin:8px 0 18px">${p ? esc(p.judul) : ''}</h2>
+      <div class="lg-sisa-besar" id="lgSisaBesar"></div>
       <div class="lg-qr" id="lgQrBesar" style="display:inline-flex;padding:20px"></div>
       <div class="lg-url" style="font-size:22px;margin-top:16px">${esc(url)}</div>
       ${ligaServer && !ligaServer.publik && ligaServer.ip && ligaServer.ip.length > 1
@@ -4919,11 +4986,12 @@ function qrBesar(){
     </div>`;
   $id('overlay').classList.add('on');
   gambarQR($id('lgQrBesar'), url, 380);
+  segarkanSisaBid();
 }
 
 /* --- layar Liga --- */
 function bukaLiga(){ go('liga'); }
-function ligaTab(t){ ligaTabAktif = t; renderLiga(); pgKabar(); }
+function ligaTab(t){ ligaTabAktif = t; if(layarSekarang === 'liga') ingatLayar('liga'); renderLiga(); pgKabar(); }
 
 function renderLiga(){
   document.querySelectorAll('#ligaTabs [data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === ligaTabAktif));
@@ -5503,7 +5571,7 @@ function terapkanModeApp(m){
 }
 
 /* ---------------- Layar utama mode standar ---------------- */
-function stdTab(t){ stdTabAktif = t; renderStd(); }
+function stdTab(t){ stdTabAktif = t; if(layarSekarang === 'std') ingatLayar('std'); renderStd(); }
 
 function renderStd(){
   const s = pastikanSesiStd();
@@ -7377,23 +7445,18 @@ async function cekSiapKelas(){
   // ?demo memuat data contoh; bila penggantian data dibatalkan, alur normal tetap jalan
   const pakaiContoh = /(^|[?&])demo/.test(location.search) && muatContoh(12, 50);
   muatN();
-  try{ modeApp = localStorage.getItem(MKEY) === 'standar' ? 'standar' : 'gamifikasi'; }catch(e){}
-  if(pakaiContoh) modeApp = 'gamifikasi';
-  if(modeApp === 'standar' && !pakaiContoh){
-    // data forum tetap dimuat (beku) — hanya tampilannya yang diganti notulen
-    setMode('PTP'); terapkanModeApp('standar'); pulihkanBerkas().then(()=>{ if(modeApp === 'standar') go('std'); });
-  }else if(!pakaiContoh){
-    // pulihkan sesi yang sempat ter-refresh — kendali selalu kembali ke PTP,
-    // langsung ke pembahasan yang sedang berjalan supaya kelas tidak kehilangan jejak
+  // SELALU dibuka di layar pembuka, apa pun sesi terakhirnya (forum maupun Mode Standar).
+  // Sesi terakhir dilanjutkan lewat tombol "Lanjutkan Sesi Terakhir" di layar itu.
+  // modeApp di memori dimulai 'gamifikasi' (layar pembuka milik mode itu); pilihan mode
+  // yang tersimpan baru ditimpa begitu pengguna benar-benar pindah layar (lihat ingatLayar).
+  modeApp = 'gamifikasi';
+  document.body.classList.remove('mode-standar');
+  if(!pakaiContoh){
     setMode('PTP');
-    const aktif = cari(S.aktifId);
-    if(aktif && sedangBerjalan(aktif)){ go('tanggapan'); renderTanggapan(); }
-    else if(S.masalah.length) go('dash');
     // berkas tersambung diperiksa belakangan karena sifatnya asinkron;
     // isinya menang atas simpanan browser agar sesi bisa pindah laptop
-    pulihkanBerkas();
+    pulihkanBerkas().then(siapkanLanjut);
   }
+  siapkanLanjut();
 })();
-</script>
-</body>
-</html>
+</scr
