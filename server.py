@@ -221,16 +221,14 @@ def cek_dan_pasang_update_otomatis():
     aplikasi dibuka, supaya PTP selalu pakai versi terbaru tanpa perlu ingat
     pencet Ctrl+Shift+U atau buka ORBIT-update.bat manual tiap ada rilis baru.
 
-    Cuma HEAD request kecil (bandingkan ETag rilis dengan tanda lokal) — zip
-    53MB baru diunduh kalau memang ada versi baru. Gagal/offline dilewati
+    Cuma HEAD request kecil (bandingkan ETag rilis dengan tanda lokal) —
+    zip baru diunduh kalau memang ada versi baru. Gagal/offline dilewati
     diam-diam: sesi harus tetap bisa dibuka tanpa internet.
 
-    Belum ada tanda lokal (pertama kali fitur ini jalan) -> JANGAN langsung
-    unduh. Berkas yang sedang aktif sudah didapat lewat jalur update biasa,
-    jadi dianggap sudah yang terbaru saat itu; cukup catat tandanya sebagai
-    titik awal. Tanpa ini, tiap perubahan lokal yang belum sempat dirilis
-    (mis. sedang dikembangkan) akan langsung tertimpa balik ke rilis lama
-    pada percobaan pertama."""
+    Belum ada tanda lokal (laptop PTP yang baru mengekstrak ORBIT.zip, yang
+    bisa saja sudah basi) -> langsung unduh rilis terbaru di jalan pertama.
+    Salinan pengembang tidak terpengaruh: ia sudah dilewati di atas lewat
+    salinan_pengembang()."""
     if salinan_pengembang():
         print('  (salinan pengembang terdeteksi — cek pembaruan otomatis dilewati; pakai git)')
         return
@@ -244,24 +242,17 @@ def cek_dan_pasang_update_otomatis():
         return
     if not etag:
         return
-    if not os.path.exists(TANDA_VERSI):
-        try:
-            with open(TANDA_VERSI, 'w', encoding='utf-8') as f:
-                f.write(etag)
-        except OSError:
-            pass
-        return
     try:
         with open(TANDA_VERSI, encoding='utf-8') as f:
             lama = f.read().strip()
     except OSError:
-        lama = None
+        lama = None   # belum ada tanda -> dianggap perlu update
     if etag == lama:
         print('  Sudah versi terbaru.')
         return
     print('  Versi baru ditemukan — memasang...')
     try:
-        unduh_dan_pasang_update()
+        etag = unduh_dan_pasang_update() or etag
     except Exception as e:
         print('  [!] Gagal memasang pembaruan otomatis: %s' % e)
         print('  Aplikasi tetap dibuka dengan versi yang ada.')
