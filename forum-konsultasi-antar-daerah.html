@@ -1266,13 +1266,9 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
           <button class="btn btn-lg btn-ghost" id="btnLanjut" style="display:none;color:var(--accent);border-color:var(--accent)"
             onclick="lanjutkanSesiTerakhir()">↩ Lanjutkan Sesi Terakhir</button>
           <button class="btn btn-ghost" onclick="cekSiapKelas()">Cek Siap Kelas</button>
-          <button class="btn btn-ghost" onclick="muatContoh(12,50)"
+          <button class="btn btn-ghost" onclick="pilihDataContoh()"
             title="Isi aplikasi dengan sesi contoh untuk melihat tampilannya saat penuh">
-            Contoh · Lintas Pulau
-          </button>
-          <button class="btn btn-ghost" onclick="muatContoh(12,50,'satu-pulau')"
-            title="Isi aplikasi dengan sesi contoh yang seluruh pesertanya berkumpul di satu pulau (Jawa)">
-            Contoh · Satu Pulau
+            Data Contoh
           </button>
         </div>
         <p id="lanjutInfo" style="display:none;font-size:13.5px;color:var(--accent);margin-top:14px;font-weight:700"></p>
@@ -1353,10 +1349,8 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
       <button class="btn btn-ghost" onclick="cekSiapKelas()">Cek Siap Kelas</button>
       <button class="btn btn-ghost" id="btnKembaliContoh" style="display:none;margin-left:auto;color:var(--warn);border-color:var(--warn)"
         onclick="kembaliDariContoh()" title="Kembalikan data sesi asli, sebelum data contoh dimuat">↺ Kembali ke Data Asli</button>
-      <button class="btn btn-ghost" id="btnDataContoh" style="margin-left:auto" onclick="muatContoh(12,50)"
-        title="Ganti isi sesi dengan data contoh: peserta tersebar lintas pulau — data asli disimpan otomatis dan bisa dikembalikan">Data Contoh · Lintas Pulau</button>
-      <button class="btn btn-ghost" onclick="muatContoh(12,50,'satu-pulau')"
-        title="Ganti isi sesi dengan data contoh: seluruh peserta berkumpul di satu pulau (Jawa) — data asli disimpan otomatis dan bisa dikembalikan">Data Contoh · Satu Pulau</button>
+      <button class="btn btn-ghost" id="btnDataContoh" style="margin-left:auto" onclick="pilihDataContoh()"
+        title="Ganti isi sesi dengan data contoh — data asli disimpan otomatis dan bisa dikembalikan">Data Contoh</button>
       <button class="btn btn-ghost" style="color:var(--danger)" onclick="mulaiKelasBaru()"
         title="Kosongkan forum dan Liga untuk kelas berikutnya — unduh PDF risalah dan Excel Liga dulu">Mulai Kelas Baru</button>
     </div>
@@ -5373,6 +5367,26 @@ function buatLigaContoh(masalahList, jmlPeserta, daerahList){
 const PROV_JAWA = new Set(['Daerah Khusus Ibukota Jakarta', 'Banten', 'Jawa Barat', 'Jawa Tengah',
                            'Daerah Istimewa Yogyakarta', 'Jawa Timur']);
 const rataDariDaftar = (arr, n) => Array.from({length:Math.min(n, arr.length)}, (_, i) => arr[Math.floor((i + .5) * arr.length / Math.min(n, arr.length))]);
+
+function pilihDataContoh(){
+  $id('modalBody').innerHTML = `
+    <div class="rk-lbl" style="margin-top:0">Data Contoh · Pilih Jenis</div>
+    <div class="set-opsi">
+      <button onclick="tutupModal();muatContoh(12,50)">
+        <b>Lintas Pulau</b>
+        <span>Peserta tersebar di banyak pulau — peta menampilkan seluruh Indonesia.</span>
+      </button>
+      <button onclick="tutupModal();muatContoh(12,50,'satu-pulau')">
+        <b>Satu Pulau</b>
+        <span>Seluruh peserta berkumpul di Pulau Jawa — untuk melihat tampilan peta yang otomatis memperbesar.</span>
+      </button>
+    </div>
+    <p style="color:var(--text-dim);font-size:13.5px;line-height:1.55;margin-top:14px">
+      Berisi 12 masalah dari 12 daerah dan 54 tanggapan dari 50 daerah lain. Data sesi yang ada dicadangkan otomatis
+      dan bisa dikembalikan lewat tombol "Kembali ke Data Asli".</p>
+    <div style="display:flex;margin-top:18px"><button class="btn btn-ghost" style="margin-left:auto" onclick="tutupModal()">Batal</button></div>`;
+  $id('overlay').classList.add('on');
+}
 
 function muatContoh(jmlMasalah, jmlPenanggap, tipe){
   jmlMasalah = jmlMasalah || 12; jmlPenanggap = jmlPenanggap || 50;
