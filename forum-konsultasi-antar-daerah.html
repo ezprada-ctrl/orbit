@@ -841,7 +841,7 @@ body.mode-standar #panel{display:none!important}
    "daerah A menanggapi masalah daerah B". Titik kecil yang berjalan
    di sepanjang busur = praktik yang sedang "mengalir" antar-daerah.
    ============================================================ */
-.peta svg{width:100%;height:auto;display:block;overflow:visible}
+.peta svg{width:100%;height:auto;display:block;overflow:hidden}
 :root[data-theme="dark"]{--peta-darat:#2C2C2E;--peta-pantai:#48484A}
 :root[data-theme="light"]{--peta-darat:#DADAE0;--peta-pantai:#C2C2CA}
 .pt-darat{fill:var(--peta-darat);stroke:var(--peta-pantai);stroke-width:.7;stroke-linejoin:round}
@@ -1249,7 +1249,11 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
           <button class="btn btn-ghost" onclick="cekSiapKelas()">Cek Siap Kelas</button>
           <button class="btn btn-ghost" onclick="muatContoh(12,50)"
             title="Isi aplikasi dengan sesi contoh untuk melihat tampilannya saat penuh">
-            Lihat Contoh Sesi Terisi
+            Contoh · Lintas Pulau
+          </button>
+          <button class="btn btn-ghost" onclick="muatContoh(12,50,'satu-pulau')"
+            title="Isi aplikasi dengan sesi contoh yang seluruh pesertanya berkumpul di satu pulau (Jawa)">
+            Contoh · Satu Pulau
           </button>
         </div>
         <p style="font-size:13.5px;color:var(--text-dim);margin-top:14px;font-weight:600">
@@ -1330,7 +1334,9 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
       <button class="btn btn-ghost" id="btnKembaliContoh" style="display:none;margin-left:auto;color:var(--warn);border-color:var(--warn)"
         onclick="kembaliDariContoh()" title="Kembalikan data sesi asli, sebelum data contoh dimuat">↺ Kembali ke Data Asli</button>
       <button class="btn btn-ghost" id="btnDataContoh" style="margin-left:auto" onclick="muatContoh(12,50)"
-        title="Ganti isi sesi dengan data contoh untuk melihat tampilan saat penuh — data asli disimpan otomatis dan bisa dikembalikan">Data Contoh</button>
+        title="Ganti isi sesi dengan data contoh: peserta tersebar lintas pulau — data asli disimpan otomatis dan bisa dikembalikan">Data Contoh · Lintas Pulau</button>
+      <button class="btn btn-ghost" onclick="muatContoh(12,50,'satu-pulau')"
+        title="Ganti isi sesi dengan data contoh: seluruh peserta berkumpul di satu pulau (Jawa) — data asli disimpan otomatis dan bisa dikembalikan">Data Contoh · Satu Pulau</button>
       <button class="btn btn-ghost" style="color:var(--danger)" onclick="mulaiKelasBaru()"
         title="Kosongkan forum dan Liga untuk kelas berikutnya — unduh PDF risalah dan Excel Liga dulu">Mulai Kelas Baru</button>
     </div>
@@ -5220,14 +5226,14 @@ document.addEventListener('keydown', e=>{
 /* Peserta contoh untuk Liga Inovasi — nama fiktif dipasangkan dengan daerah
    resmi (WILAYAH) supaya Papan Peringkat tidak pernah kosong saat data contoh
    dimuat: minimal 30 peserta, meniru liga yang benar-benar sudah dimainkan. */
-function buatRosterContoh(jmlPeserta){
+function buatRosterContoh(jmlPeserta, daerahList){
   const depan = ['Rudi','Siti','Andi','Dewi','Budi','Rina','Agus','Wati','Hendra','Yuni',
     'Dedi','Lina','Fajar','Nur','Bayu','Sari','Eko','Ratna','Wawan','Indah',
     'Joko','Ayu','Slamet','Tuti','Hadi','Mira','Yanto','Fitri','Iwan','Dian',
     'Sigit','Wulan','Tono','Ika','Bambang','Novi','Hari','Sri','Rahmat','Putri'];
   const belakang = ['Santoso','Wijaya','Kurniawan','Setiawan','Pratama','Hidayat','Saputra',
     'Nugroho','Susanto','Gunawan','Lestari','Handayani','Kusuma','Permadi','Wibowo'];
-  const daerahPakai = WILAYAH.filter(w => w.n.indexOf('Provinsi') !== 0).map(w => w.n);
+  const daerahPakai = daerahList || WILAYAH.filter(w => w.n.indexOf('Provinsi') !== 0).map(w => w.n);
   const roster = [];
   for(let i = 0; i < jmlPeserta; i++){
     roster.push({
@@ -5268,8 +5274,8 @@ function buatPutaranContoh(masalahList, roster){
   });
 }
 
-function buatLigaContoh(masalahList, jmlPeserta){
-  const roster = buatRosterContoh(Math.max(30, jmlPeserta));
+function buatLigaContoh(masalahList, jmlPeserta, daerahList){
+  const roster = buatRosterContoh(Math.max(30, jmlPeserta), daerahList);
   return Object.assign(ligaKosong(), {
     kelas:{id:'kc' + Date.now().toString(36), nama:'Kelas Contoh (Liga Inovasi)', dibuat:new Date().toISOString()},
     roster, putaran: buatPutaranContoh(masalahList, roster), contoh:true,
@@ -5279,8 +5285,16 @@ function buatLigaContoh(masalahList, jmlPeserta){
   });
 }
 
-function muatContoh(jmlMasalah, jmlPenanggap){
+/* Dua jenis data contoh: 'lintas' (peserta tersebar di banyak pulau — bawaan) dan
+   'satu-pulau' (semua host & penanggap dari Pulau Jawa, untuk melihat tampilan
+   kelas yang pesertanya berkumpul di satu pulau, mis. peta yang otomatis zoom). */
+const PROV_JAWA = new Set(['Daerah Khusus Ibukota Jakarta', 'Banten', 'Jawa Barat', 'Jawa Tengah',
+                           'Daerah Istimewa Yogyakarta', 'Jawa Timur']);
+const rataDariDaftar = (arr, n) => Array.from({length:Math.min(n, arr.length)}, (_, i) => arr[Math.floor((i + .5) * arr.length / Math.min(n, arr.length))]);
+
+function muatContoh(jmlMasalah, jmlPenanggap, tipe){
   jmlMasalah = jmlMasalah || 12; jmlPenanggap = jmlPenanggap || 50;
+  const satuPulau = tipe === 'satu-pulau';
   // Data asli dicadangkan otomatis (kecuali sudah di "mode contoh" — tidak perlu
   // menimpa cadangan yang sudah ada dengan data contoh sebelumnya) supaya tombol
   // "Data Contoh" aman diklik kapan saja tanpa risiko kehilangan data sesi asli.
@@ -5289,7 +5303,9 @@ function muatContoh(jmlMasalah, jmlPenanggap){
     try{ localStorage.setItem(CADANGAN_CONTOH_KEY, JSON.stringify(S)); }catch(e){}
   }
 
-  const hostTetap = ['Kota Medan','Kota Surabaya','Kabupaten Sleman','Kota Balikpapan',
+  const daerahJawa = WILAYAH.filter(w => w.n.indexOf('Provinsi') !== 0 && PROV_JAWA.has(w.p)).map(w => w.n);
+  const hostTetap = satuPulau ? rataDariDaftar(daerahJawa, 12) :
+    ['Kota Medan','Kota Surabaya','Kabupaten Sleman','Kota Balikpapan',
     'Kota Bandung','Kabupaten Badung','Kota Makassar','Kabupaten Aceh Jaya','Kota Palembang',
     'Kabupaten Banyuwangi','Kota Manado','Kabupaten Kutai Kartanegara'];
   const judul = ['Piutang PBB-P2 tahun lama sulit ditagih','Kepatuhan pajak hiburan masih rendah',
@@ -5314,10 +5330,15 @@ function muatContoh(jmlMasalah, jmlPenanggap){
     'Pemeriksaan berbasis risiko lebih hemat tenaga daripada menambah petugas.'];
 
   // nama penanggap diambil merata dari daftar wilayah resmi agar selalu valid
-  const pool = [], langkah = Math.max(1, Math.floor(WILAYAH.length / (jmlPenanggap + 20)));
-  for(let i = 0; i < WILAYAH.length && pool.length < jmlPenanggap; i += langkah){
-    const n = WILAYAH[i].n;
-    if(n.indexOf('Provinsi') !== 0 && hostTetap.indexOf(n) < 0 && pool.indexOf(n) < 0) pool.push(n);
+  let pool = [];
+  if(satuPulau){
+    pool = rataDariDaftar(daerahJawa.filter(n => hostTetap.indexOf(n) < 0), jmlPenanggap);
+  }else{
+    const langkah = Math.max(1, Math.floor(WILAYAH.length / (jmlPenanggap + 20)));
+    for(let i = 0; i < WILAYAH.length && pool.length < jmlPenanggap; i += langkah){
+      const n = WILAYAH[i].n;
+      if(n.indexOf('Provinsi') !== 0 && hostTetap.indexOf(n) < 0 && pool.indexOf(n) < 0) pool.push(n);
+    }
   }
 
   S = {tanggal:new Date().toLocaleDateString('sv'), mode:'PTP', aktifId:null, masalah:[], contoh:true};
@@ -5344,7 +5365,7 @@ function muatContoh(jmlMasalah, jmlPenanggap){
   if(L.roster.length && !L.contoh){
     try{ localStorage.setItem(CADANGAN_CONTOH_LIGA_KEY, JSON.stringify(L)); }catch(e){}
   }
-  L = buatLigaContoh(S.masalah, jmlPenanggap);
+  L = buatLigaContoh(S.masalah, jmlPenanggap, satuPulau ? daerahJawa : null);
   try{ localStorage.setItem(LKEY, JSON.stringify(L)); }catch(e){}
 
   prevStats = {m:0, d:0, t:0}; chipPenuh = false;
@@ -5352,7 +5373,7 @@ function muatContoh(jmlMasalah, jmlPenanggap){
   // menimpa berkas tersambung (Simpan Otomatis) yang seharusnya berisi data asli.
   try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
   setMode('PTP'); go('dash');
-  toast('Data contoh dimuat: ' + jmlMasalah + ' masalah, ' + semuaDaerah().size + ' daerah, ' + L.roster.length + ' peserta Liga Inovasi.');
+  toast('Data contoh' + (satuPulau ? ' (satu pulau: Jawa)' : ' (lintas pulau)') + ' dimuat: ' + jmlMasalah + ' masalah, ' + semuaDaerah().size + ' daerah, ' + L.roster.length + ' peserta Liga Inovasi.');
   return true;
 }
 
@@ -6201,6 +6222,12 @@ function renderPeta(box, opt){
     }
   })();
 
+  /* Zoom dihitung SEBELUM menggambar: saat peta diperbesar, titik & tulisan digambar
+     lebih kecil di koordinat peta supaya di layar tetap proporsional (tulisan tidak
+     membengkak, dan lebih banyak nama muat tanpa saling menimpa). */
+  const zoomSasaran = zoomPetaSasaran(titik);
+  const sk = zoomSasaran.skala, u = 1 / sk, kd = 1 / Math.pow(sk, .6);
+
   // relasi berarah: penanggap → pengangkat
   const relasi = new Map();
   S.masalah.forEach(m => m.tanggapan.forEach(t=>{
@@ -6232,7 +6259,7 @@ function renderPeta(box, opt){
     // "komet" = praktik yang sedang mengalir. Dibatasi supaya tetap ringan di laptop kelas.
     if(j < 90 && (!adaSorot || r.sorot)){
       const dur = (2.4 + d / 170).toFixed(2), mulai = ((o.urut ? j * jeda + 900 : 0) / 1000 + (j % 7) * .37).toFixed(2);
-      komet += `<circle r="${r.sorot ? 3.2 : 2.3}" class="pt-komet${r.sorot ? ' pt-sorot' : ''}${lama ? ' pt-langsung' : ''}"
+      komet += `<circle r="${((r.sorot ? 3.2 : 2.3) * kd).toFixed(2)}" class="pt-komet${r.sorot ? ' pt-sorot' : ''}${lama ? ' pt-langsung' : ''}"
         style="animation-delay:${mulai}s"><animateMotion dur="${dur}s" begin="${mulai}s" repeatCount="indefinite"><mpath href="#${id}"/></animateMotion></circle>`;
     }
     sudah.add(k); j++;
@@ -6247,18 +6274,18 @@ function renderPeta(box, opt){
     const tunda = `animation-delay:${o.urut ? i * urutJeda : 0}ms`;
     if(p.v.angkat){
       const s = (o.sorotHost === n) || (o.sorotMasalah && cari(o.sorotMasalah) && cari(o.sorotMasalah).daerah.trim() === n);
-      const r = 4 + Math.min(4, p.v.angkat * 1.2);
+      const r = (4 + Math.min(4, p.v.angkat * 1.2)) * kd;
       host += `<circle class="pt-denyut${s ? ' pt-sorot' : ''}" cx="${p.x}" cy="${p.y}" r="${r}" style="animation-delay:${(i % 9) * .3}s"/>
         <circle class="pt-host${o.klik ? ' pt-klik' : ''}${lama ? ' pt-langsung' : ''}" cx="${p.x}" cy="${p.y}" r="${r}" style="${tunda}${s ? ';fill:var(--liga)' : ''}"
           ${o.klik ? `data-nama="${esc(n)}"` : ''}><title>${esc(n)}</title></circle>`;
     }else{
-      tamu += `<circle class="pt-tamu${lama ? ' pt-langsung' : ''}" cx="${p.x}" cy="${p.y}" r="${2.6 + Math.min(2.4, p.v.tanggap * .6)}" style="${tunda}"><title>${esc(n)}</title></circle>`;
+      tamu += `<circle class="pt-tamu${lama ? ' pt-langsung' : ''}" cx="${p.x}" cy="${p.y}" r="${((2.6 + Math.min(2.4, p.v.tanggap * .6)) * kd).toFixed(2)}" style="${tunda}"><title>${esc(n)}</title></circle>`;
     }
     sudah.add('@' + n); i++;
   });
 
   // label hanya untuk pengangkat masalah; yang bertabrakan dilewati
-  const FS = box.classList.contains('besar') ? 12.5 : 11;
+  const FS = (box.classList.contains('besar') ? 12.5 : 11) * u;   // tetap sama besar di layar walau peta diperbesar
   const kotak = [];
   const tabrak = b => kotak.some(c => b.x1 < c.x2 && b.x2 > c.x1 && b.y1 < c.y2 && b.y2 > c.y1);
   const calon = [...titik.entries()].filter(([, p]) => p.v.angkat)
@@ -6269,10 +6296,11 @@ function renderPeta(box, opt){
     const s = n === o.sorotHost || (o.sorotMasalah && cari(o.sorotMasalah) && cari(o.sorotMasalah).daerah.trim() === n);
     // tempat pas di sebelah titik dicoba dulu; kalau semua nabrak (titik lagi rapat),
     // geser ke diagonal atas/bawah dengan garis penunjuk tipis supaya nama tetap kebaca.
+    const g9 = 9 * kd, g8 = 8 * u, g14 = 14 * u;   // g9 mengikuti jari-jari titik yang ikut mengecil
     const posisi = [
-      [p.x + 9, p.y, 'start', false], [p.x - 9, p.y, 'end', false],
-      [p.x + 8, p.y - 14, 'start', true], [p.x - 8, p.y - 14, 'end', true],
-      [p.x + 8, p.y + 14, 'start', true], [p.x - 8, p.y + 14, 'end', true]
+      [p.x + g9, p.y, 'start', false], [p.x - g9, p.y, 'end', false],
+      [p.x + g8, p.y - g14, 'start', true], [p.x - g8, p.y - g14, 'end', true],
+      [p.x + g8, p.y + g14, 'start', true], [p.x - g8, p.y + g14, 'end', true]
     ];
     for(const [ax, ay, anchor, garis] of posisi){
       const x1 = anchor === 'start' ? ax : ax - w, b = {x1, x2:x1 + w, y1:ay - h/2 - 1, y2:ay + h/2};
@@ -6280,13 +6308,13 @@ function renderPeta(box, opt){
       if(!s && tabrak(b)) continue;
       kotak.push(b);
       const lamaL = sudah.has('L' + n) && !o.urut; sudah.add('L' + n);
-      if(garis) tunjuk += `<line class="pt-tunjuk${lamaL ? ' pt-langsung' : ''}" x1="${p.x}" y1="${p.y}" x2="${ax}" y2="${ay}"/>`;
-      label += `<text class="pt-label${s ? ' pt-sorot' : ''}${lamaL ? ' pt-langsung' : ''}" x="${ax}" y="${(ay + FS * .36).toFixed(1)}" text-anchor="${anchor}">${esc(t)}</text>`;
+      if(garis) tunjuk += `<line class="pt-tunjuk${lamaL ? ' pt-langsung' : ''}" x1="${p.x}" y1="${p.y}" x2="${ax}" y2="${ay}" style="stroke-width:${(.8 * u).toFixed(2)}px"/>`;
+      label += `<text class="pt-label${s ? ' pt-sorot' : ''}${lamaL ? ' pt-langsung' : ''}" x="${ax}" y="${(ay + FS * .36).toFixed(1)}" text-anchor="${anchor}"
+        style="font-size:${(s ? Math.max(13 * u, FS) : FS).toFixed(2)}px;stroke-width:${(3.5 * u).toFixed(2)}px">${esc(t)}</text>`;
       break;
     }
   });
 
-  const zoomSasaran = zoomPetaSasaran(titik);
   const zoomPertama = !box._zoomTerakhir;
   const zoomAwal = zoomPertama ? ZOOM_UTUH : box._zoomTerakhir;
 
