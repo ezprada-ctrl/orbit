@@ -3970,6 +3970,106 @@ function teksKeBaris(t){
   return baris.map(b => b.split(pem).map(c => c.replace(/^"(.*)"$/, '$1')));
 }
 
+/* ---- Impor daftar peserta — SATU standar untuk semua mode (Liga & Mode Standar) ----
+   Kolom baku: Nama | Unit Kerja | Daerah. Pembacanya pintar:
+   - kolom dikenali dari JUDULNYA, urutan bebas; yang tidak ada boleh dilewati
+     (hanya Nama yang wajib);
+   - tanpa baris judul, kolom dikenali dari isinya (kolom berisi nama pemda =
+     Daerah) dan urutan baku Nama → Unit Kerja → Daerah;
+   - kolom lain yang tidak dikenal (mis. NIP, Jabatan) tidak dibuang: disimpan
+     di p.extra {judul: isi} lalu ditampilkan di tabel peserta dan ekspor.
+   `ambigu` = peran kolom tunggal tanpa kepastian ("Instansi", "Asal", atau
+   dua kolom tanpa judul): 'daerah' untuk Liga, 'unit' untuk Mode Standar. */
+const POLA_NOMOR = /^(no\.?|nomor|no\.? urut|urut|#)$/i;
+function peranJudul(j){
+  const t = j.toLowerCase().trim();
+  if(!t) return null;
+  if(POLA_NOMOR.test(t)) return 'nomor';
+  if(/unit|satker|satuan kerja|kantor|bagian|bidang|organisasi|opd|skpd|biro|direktorat/.test(t)) return 'unit';
+  if(/daerah|pemda|wilayah|provinsi|kabupaten|kota|\bkab\b|domisili|lokasi/.test(t)) return 'daerah';
+  if(/instansi|^asal/.test(t)) return 'ambigu';
+  if(/^(nama|name)\b|^peserta$/.test(t)) return 'nama';
+  return null;
+}
+function bacaTabelPeserta(rows, ambigu){
+  rows = rows.map(r => (r || []).map(c => rapi(String(c == null ? '' : c)))).filter(r => r.some(Boolean));
+  if(!rows.length) return [];
+  const lebar = Math.max(...rows.map(r => r.length));
+  const adaJudul = rows[0].some(c => peranJudul(c) === 'nama');
+  const peran = new Array(lebar).fill(null);   // 'nama' | 'unit' | 'daerah' | 'nomor' | null (= data tambahan)
+  const judul = new Array(lebar).fill('');
+  const pakai = r => !peran.includes(r);
+  let isi = rows;
+  if(adaJudul){
+    rows[0].forEach((c, i)=>{ judul[i] = c; });
+    rows[0].forEach((c, i)=>{
+      const p = peranJudul(c);
+      if(p && p !== 'ambigu' && pakai(p) ) peran[i] = p;
+    });
+    rows[0].forEach((c, i)=>{
+      if(peran[i] || peranJudul(c) !== 'ambigu') return;
+      const jatah = pakai('unit') && pakai('daerah') ? ambigu : pakai('daerah') ? 'daerah' : pakai('unit') ? 'unit' : null;
+      if(jatah) peran[i] = jatah;
+    });
+    isi = rows.slice(1);
+  }else{
+    let awal = 0;
+    if(lebar > 1 && rows.every(r => /^\d+$/.test(r[0] || ''))){ peran[0] = 'nomor'; awal = 1; }
+    peran[awal] = 'nama';
+  }
+  const rasioDaerah = i => {
+    const v = isi.map(r => r[i] || '').filter(Boolean);
+    return v.length ? v.filter(x => daerahStandar(kanonDaerah(x))).length / v.length : 0;
+  };
+  // kolom tanpa peran tetapi isinya nama daerah resmi → Daerah (pintar membaca isi, bukan hanya judul)
+  if(pakai('daerah')){
+    const i = peran.findIndex((p, k) => !p && rasioDaerah(k) >= (adaJudul ? 0.6 : 0.5));
+    if(i >= 0) peran[i] = 'daerah';
+  }
+  if(!adaJudul){
+    const sisa = peran.map((p, i) => p ? -1 : i).filter(i => i >= 0);
+    if(pakai('daerah') && pakai('unit')){
+      if(sisa.length >= 2){ peran[sisa[0]] = 'unit'; peran[sisa[1]] = 'daerah'; }
+      else if(sisa.length === 1) peran[sisa[0]] = ambigu;
+    }else if(pakai('unit') && sisa.length) peran[sisa[0]] = 'unit';
+    else if(pakai('daerah') && sisa.length) peran[sisa[0]] = 'daerah';
+  }
+  if(pakai('nama')) return [];
+  const iNama = peran.indexOf('nama'), iUnit = peran.indexOf('unit'), iDaerah = peran.indexOf('daerah');
+  const tambahan = [];
+  peran.forEach((p, i)=>{
+    if(p) return;
+    if(!isi.some(r => r[i])) return;
+    tambahan.push([i, judul[i] || ('Kolom ' + (i + 1))]);
+  });
+  return isi.map(r => {
+    const extra = {};
+    tambahan.forEach(([i, nama])=>{ if(r[i]) extra[nama] = r[i]; });
+    return {nama:r[iNama] || '', unit:iUnit >= 0 ? (r[iUnit] || '') : '',
+            daerah:iDaerah >= 0 ? kanonDaerah(r[iDaerah] || '') : '', extra};
+  }).filter(p => p.nama);
+}
+/* Gabungkan data impor ke peserta yang sudah ada: hanya isian yang TERISI yang menimpa.
+   Mengembalikan true bila ada yang berubah. */
+function gabungDataPeserta(ada, p){
+  let ubah = false;
+  ['unit', 'daerah'].forEach(k=>{ if(p[k] && ada[k] !== p[k]){ ada[k] = p[k]; ubah = true; } });
+  Object.keys(p.extra || {}).forEach(k=>{
+    ada.extra = ada.extra || {};
+    if(ada.extra[k] !== p.extra[k]){ ada.extra[k] = p.extra[k]; ubah = true; }
+  });
+  return ubah;
+}
+/* Yang dikirim ke HP peserta cuma id, nama, daerah. Peserta tanpa daerah (hanya unit kerja)
+   tetap punya keterangan pembeda di daftar pilihan HP. */
+const pesertaUntukHP = daftar => daftar.map(p => ({id:p.id, nama:p.nama, daerah:p.daerah || p.unit || ''}));
+/* Judul kolom tambahan dari seluruh daftar, urut kemunculan — untuk tabel & ekspor. */
+function kolomTambahanPeserta(daftar){
+  const k = [];
+  daftar.forEach(p => Object.keys(p.extra || {}).forEach(n => { if(!k.includes(n)) k.push(n); }));
+  return k;
+}
+
 function muatSkrip(src){
   return new Promise((ok, gagal)=>{
     const s = document.createElement('script');
@@ -4225,33 +4325,24 @@ function rapikanRoster(){
   return n;
 }
 
-function barisKeRoster(rows){
-  rows = rows.map(r => (r || []).map(c => rapi(String(c == null ? '' : c)))).filter(r => r.some(Boolean));
-  if(!rows.length) return [];
-  let iN = 0, iD = 1;
-  const h = rows[0].map(c => c.toLowerCase());
-  if(h.some(c => /nama/.test(c))){
-    iN = h.findIndex(c => /nama/.test(c));
-    const d = h.findIndex(c => /daerah|asal|instansi|pemda|wilayah|kab|kota/.test(c) && !/nama/.test(c));
-    iD = d >= 0 ? d : (iN === 0 ? 1 : 0);
-    rows = rows.slice(1);
-  }
-  return rows.map(r => ({nama:r[iN] || '', daerah:kanonDaerah(r[iD] || '')})).filter(p => p.nama);
-}
+const barisKeRoster = rows => bacaTabelPeserta(rows, 'daerah');
 
 
 /* Gabung, bukan timpa: peserta yang sudah punya bid tidak boleh hilang
-   (poinnya akan yatim). Nama yang sama → id dipertahankan, daerah diperbarui. */
+   (poinnya akan yatim). Nama yang sama → id dipertahankan, data yang terisi diperbarui. */
 function terapkanRoster(baru){
-  if(!baru.length){ toast('Tidak ada baris peserta yang terbaca. Kolom: nama | daerah.'); return; }
+  if(!baru.length){ toast('Tidak ada baris peserta yang terbaca. Kolom: Nama | Unit Kerja | Daerah.'); return; }
   const unik = new Map();
   baru.forEach(p => unik.set(normal(p.nama), p));
   let tambah = 0, ubah = 0;
   unik.forEach((p, k)=>{
     const ada = L.roster.find(r => normal(r.nama) === k);
-    if(ada){ if(ada.daerah !== p.daerah){ ada.daerah = p.daerah; ubah++; } }
-    else { L.roster.push({id:'r' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-                          nama:p.nama, daerah:p.daerah}); tambah++; }
+    if(ada){ if(gabungDataPeserta(ada, p)) ubah++; }
+    else { const baruP = {id:'r' + Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+                          nama:p.nama, daerah:p.daerah || ''};
+           if(p.unit) baruP.unit = p.unit;
+           if(p.extra && Object.keys(p.extra).length) baruP.extra = {...p.extra};
+           L.roster.push(baruP); tambah++; }
   });
   simpanLiga(); renderLiga();
   const asing = L.roster.filter(p => !daerahStandar(p.daerah)).length;
@@ -4272,7 +4363,7 @@ async function imporRoster(f){
     }
     const wb = XLSX.read(await f.arrayBuffer(), {type:'array'});
     const ws = wb.Sheets[wb.SheetNames[0]];
-    terapkanRoster(barisKeRoster(XLSX.utils.sheet_to_json(ws, {header:1, defval:''})));
+    terapkanRoster(barisKeRoster(XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false})));
   }catch(e){ toast('Gagal membaca berkas: ' + e.message); }
 }
 
@@ -4282,10 +4373,10 @@ function tempelRoster(){
   terapkanRoster(barisKeRoster(teksKeBaris(t)));
 }
 function tambahSatuPeserta(){
-  const n = $id('lgNamaBaru'), d = $id('lgDaerahBaru');
+  const n = $id('lgNamaBaru'), d = $id('lgDaerahBaru'), u = $id('lgUnitBaru');
   if(!n.value.trim()){ sorotiKolom(n, 'Nama peserta belum diisi.'); return; }
   if(!d.value.trim()){ sorotiKolom(d, 'Daerah peserta belum diisi.'); return; }
-  terapkanRoster([{nama:rapi(n.value), daerah:kanonDaerah(d.value)}]);
+  terapkanRoster([{nama:rapi(n.value), unit:rapi(u.value), daerah:kanonDaerah(d.value), extra:{}}]);
 }
 function jumlahBid(pid){ return L.putaran.reduce((a,p)=> a + p.bids.filter(b => b.pesertaId === pid).length, 0); }
 function ubahPeserta(id){
@@ -4294,8 +4385,11 @@ function ubahPeserta(id){
   if(n === null) return;
   const d = prompt('Daerah:', p.daerah);
   if(d === null) return;
+  const u = prompt('Unit kerja (boleh dikosongkan):', p.unit || '');
+  if(u === null) return;
   if(!n.trim()) return toast('Nama tidak boleh kosong.');
   p.nama = rapi(n); p.daerah = kanonDaerah(d);
+  if(rapi(u)) p.unit = rapi(u); else delete p.unit;
   simpanLiga(); renderLiga(); toast('Data peserta diperbarui.');
 }
 function hapusPeserta(id){
@@ -4360,7 +4454,7 @@ function hitungPeringkat(){
 let pollBid = null;
 function kirimBuka(p){
   return api('/api/liga/buka', {masalahId:p.masalahId, judul:p.judul, daerah:p.daerahMasalah,
-    pemilik:p.pemilikId || '', peserta:L.roster.filter(r => r.id !== p.pemilikId)});
+    pemilik:p.pemilikId || '', peserta:pesertaUntukHP(L.roster.filter(r => r.id !== p.pemilikId))});
 }
 
 /* PENJAGA JENDELA BID — server bisa mati sebentar (jendela hitam tertutup lalu
@@ -4931,31 +5025,35 @@ function renderLigaPeserta(el){
 
     <div class="sec-head"><h3>Impor daftar peserta</h3><div class="line"></div></div>
     <div class="card" style="padding:24px 28px">
-      <p class="lg-sub">Berkas Excel/CSV dengan dua kolom: <b>nama | daerah</b> (baris judul boleh ada). Impor ulang aman —
+      <p class="lg-sub">Berkas Excel/CSV dengan kolom <b>Nama | Unit Kerja | Daerah</b>. Hanya Nama yang wajib, kolom yang kosong
+      boleh dilewati, urutan bebas. Kolom lain (mis. NIP, Jabatan) ikut terbaca dan ditampilkan di tabel. Impor ulang aman —
       nama yang sudah ada tidak digandakan, dan peserta yang sudah punya bid tidak terhapus.</p>
       <div class="lg-bar">
         <button class="btn btn-primary" onclick="$id('lgBerkasRoster').click()">⤒ Pilih berkas Excel / CSV</button>
         <input type="file" id="lgBerkasRoster" accept=".xlsx,.xls,.csv,.txt" style="display:none"
           onchange="const f=this.files[0];this.value='';if(f)imporRoster(f)">
       </div>
-      <div class="rk-lbl">Atau salin dua kolom dari Excel lalu tempel di sini (tanpa internet pun jalan)</div>
-      <textarea class="field" id="lgTempel" rows="4" placeholder="Budi Santoso&#9;Kabupaten Sleman&#10;Siti Aminah&#9;Kota Surabaya"></textarea>
+      <div class="rk-lbl">Atau salin kolom dari Excel (termasuk baris judul bila ada) lalu tempel di sini (tanpa internet pun jalan)</div>
+      <textarea class="field" id="lgTempel" rows="4" placeholder="Nama&#9;Unit Kerja&#9;Daerah&#10;Budi Santoso&#9;Bappeda&#9;Kabupaten Sleman&#10;Siti Aminah&#9;BPKAD&#9;Kota Surabaya"></textarea>
       <div class="lg-bar"><button class="btn" onclick="tempelRoster()">Tambahkan dari tempelan</button></div>
       <div class="rk-lbl">Tambah satu peserta</div>
       <div class="lg-bar" style="margin-top:6px">
-        <input class="field" id="lgNamaBaru" style="max-width:300px" placeholder="Nama">
-        <input class="field" id="lgDaerahBaru" style="max-width:300px" placeholder="Daerah">
+        <input class="field" id="lgNamaBaru" style="max-width:260px" placeholder="Nama">
+        <input class="field" id="lgUnitBaru" style="max-width:260px" placeholder="Unit kerja (opsional)">
+        <input class="field" id="lgDaerahBaru" style="max-width:260px" placeholder="Daerah">
         <button class="btn" onclick="tambahSatuPeserta()">+ Tambah</button>
       </div>
     </div>
 
     <div class="sec-head"><h3>Peserta terdaftar (${L.roster.length})</h3><div class="line"></div></div>
-    ${L.roster.length ? `<table class="lg-tbl"><thead><tr><th>Nama</th><th>Daerah</th><th>Bid</th><th></th></tr></thead><tbody>
-      ${[...L.roster].sort((a,b)=>a.nama.localeCompare(b.nama,'id')).map(p => `<tr><td>${esc(p.nama)}</td><td>${esc(p.daerah)}${daerahStandar(p.daerah) ? '' : ' <span style="color:var(--danger);font-weight:700;font-size:12.5px">· tidak dikenal — klik Ubah</span>'}</td>
+    ${L.roster.length ? (()=>{ const adaUnit = L.roster.some(p => p.unit), ekstra = kolomTambahanPeserta(L.roster);
+      return `<table class="lg-tbl"><thead><tr><th>Nama</th>${adaUnit ? '<th>Unit Kerja</th>' : ''}<th>Daerah</th>${ekstra.map(k => '<th>' + esc(k) + '</th>').join('')}<th>Bid</th><th></th></tr></thead><tbody>
+      ${[...L.roster].sort((a,b)=>a.nama.localeCompare(b.nama,'id')).map(p => `<tr><td>${esc(p.nama)}</td>${adaUnit ? '<td>' + esc(p.unit || '') + '</td>' : ''}<td>${esc(p.daerah)}${daerahStandar(p.daerah) ? '' : ' <span style="color:var(--danger);font-weight:700;font-size:12.5px">· tidak dikenal — klik Ubah</span>'}</td>
+        ${ekstra.map(k => '<td>' + esc((p.extra || {})[k] || '') + '</td>').join('')}
         <td class="n">${jumlahBid(p.id)}</td>
         <td style="text-align:right;white-space:nowrap"><button class="btn btn-ghost" onclick="ubahPeserta('${p.id}')">Ubah</button>
         <button class="btn btn-ghost" onclick="hapusPeserta('${p.id}')">Hapus</button></td></tr>`).join('')}
-      </tbody></table>` : '<div class="empty">Belum ada peserta.</div>'}`;
+      </tbody></table>`; })() : '<div class="empty">Belum ada peserta.</div>'}`;
 }
 
 function renderLigaArsip(el){
@@ -5025,7 +5123,9 @@ function tabelEkspor(){
     ['Skor', top ? top.skor : ''], ['Jumlah bid', top ? top.bid : ''],
     ['Catatan', seri ? 'SERI pada skor, jumlah bid, dan jumlah terpilih — perlu keputusan panitia' : '']
   ];
-  const roster = [['ID','Nama','Daerah']].concat(L.roster.map(p => [p.id, p.nama, p.daerah]));
+  const ekstra = kolomTambahanPeserta(L.roster);
+  const roster = [['ID','Nama','Unit Kerja','Daerah', ...ekstra]].concat(
+    L.roster.map(p => [p.id, p.nama, p.unit || '', p.daerah, ...ekstra.map(k => (p.extra || {})[k] || '')]));
   return {ringkas, peringkat, bid, roster};
 }
 
@@ -5044,7 +5144,7 @@ async function eksporExcel(){
     lembar(t.ringkas, 'Ringkasan', [24, 70]);
     lembar(t.peringkat, 'Peringkat', [10, 30, 30, 11, 11, 13, 17, 17]);
     lembar(t.bid, 'Bid per Masalah', [8, 12, 40, 26, 26, 16, 28, 26, 60, 60, 9, 20, 15, 6]);
-    lembar(t.roster, 'Peserta', [16, 30, 30]);
+    lembar(t.roster, 'Peserta', [16, 30, 30, 30, ...t.roster[0].slice(4).map(() => 20)]);
     if((L.penilaian || []).length) lembar(tabelNilai().baris, 'Penilaian Sesi', [5, 30, 32, 15, 20, 60, 12, 7]);
     XLSX.writeFile(wb, namaFileKelas() + '.xlsx');
     toast('Excel diunduh.');
@@ -5423,7 +5523,7 @@ function isiMetaStd(s){
    berlaku mundur), dengan salinan di entri sebagai cadangan bila pesertanya dihapus. */
 function penutur(s, e){
   const p = s.peserta.find(x => x.id === e.pid);
-  return p ? {nama:p.nama, unit:p.unit} : {nama:e.nama || '(tanpa nama)', unit:e.unit || ''};
+  return p ? {nama:p.nama, unit:p.unit || p.daerah || ''} : {nama:e.nama || '(tanpa nama)', unit:e.unit || ''};
 }
 
 function renderFeedStd(){
@@ -5446,7 +5546,7 @@ function renderFeedStd(){
 }
 
 function daftarPembicara(s){
-  return s.peserta.map(p => ({id:p.id, nama:p.nama, daerah:p.unit || 'unit kerja belum diisi'}));
+  return s.peserta.map(p => ({id:p.id, nama:p.nama, daerah:p.unit || p.daerah || 'unit kerja belum diisi'}));
 }
 function renderPembicara(){
   const s = sesiStd(), lama = $id('stdPembicara');
@@ -5567,8 +5667,9 @@ function renderPesertaStd(){
   $id('stdPeserta').innerHTML = `
     <div class="std-card">
       <h4>Impor daftar peserta</h4>
-      <p class="sub">Excel/CSV dengan kolom <b>Nama</b> dan <b>Unit Kerja</b> (baris judul boleh ada, boleh tidak).
-        Nama yang sudah ada tidak digandakan, unit kerjanya diperbarui.</p>
+      <p class="sub">Excel/CSV dengan kolom <b>Nama | Unit Kerja | Daerah</b>. Hanya Nama yang wajib, kolom yang kosong boleh dilewati,
+        urutan bebas. Kolom lain (mis. NIP, Jabatan) ikut terbaca dan ditampilkan di tabel.
+        Nama yang sudah ada tidak digandakan, datanya diperbarui.</p>
       <div class="std-bar" style="margin:0">
         <button class="btn" onclick="$id('stdBerkasPeserta').click()">Pilih berkas Excel / CSV</button>
         <input type="file" id="stdBerkasPeserta" accept=".xlsx,.xls,.csv,.tsv,.txt" style="display:none">
@@ -5578,7 +5679,7 @@ function renderPesertaStd(){
         <button class="btn btn-ghost" onclick="stdIsiPesertaContoh()" title="Isi 6 peserta contoh untuk coba-coba, tanpa perlu impor Excel dulu">+ Peserta contoh</button>
       </div>
       <textarea class="field" id="stdTempelPeserta" rows="3" style="margin-top:12px"
-        placeholder="…atau tempel langsung dari Excel: kolom Nama lalu Unit Kerja"></textarea>
+        placeholder="…atau tempel langsung dari Excel (boleh dengan baris judul): Nama, Unit Kerja, Daerah, lalu kolom lain bila ada"></textarea>
       <div class="std-bar" style="margin:10px 0 0"><button class="btn btn-ghost" onclick="stdTempelPesertaOk()">Tambahkan dari tempelan</button></div>
     </div>
     <div class="std-card">
@@ -5586,17 +5687,20 @@ function renderPesertaStd(){
       <div class="row" style="align-items:flex-end">
         <div style="flex:1"><label class="fl" for="stdNamaBaru">Nama</label><input class="field" id="stdNamaBaru"></div>
         <div style="flex:1"><label class="fl" for="stdUnitBaru">Unit kerja</label><input class="field" id="stdUnitBaru"></div>
+        <div style="flex:1"><label class="fl" for="stdDaerahBaru">Daerah (opsional)</label><input class="field" id="stdDaerahBaru"></div>
         <div style="flex:none;min-width:auto"><button class="btn btn-primary" style="height:56px" onclick="stdTambahPeserta()">+ Tambah</button></div>
       </div>
     </div>
     <div class="std-card">
       <h4>Daftar peserta · ${s.peserta.length} orang</h4>
-      ${s.peserta.length ? `<table class="std-tabel"><thead><tr><th>No</th><th>Nama</th><th>Unit Kerja</th><th>Bicara</th><th></th></tr></thead><tbody>
+      ${s.peserta.length ? (()=>{ const adaDaerah = s.peserta.some(p => p.daerah), ekstra = kolomTambahanPeserta(s.peserta);
+        return `<table class="std-tabel"><thead><tr><th>No</th><th>Nama</th><th>Unit Kerja</th>${adaDaerah ? '<th>Daerah</th>' : ''}${ekstra.map(k => '<th>' + esc(k) + '</th>').join('')}<th>Bicara</th><th></th></tr></thead><tbody>
         ${s.peserta.map((p,i) => `<tr><td>${i+1}</td><td>${esc(p.nama)}</td>
-          <td>${p.unit ? esc(p.unit) : '<span style="color:var(--text-dim)">— belum diisi</span>'}</td><td>${bicara(p.id)}×</td>
+          <td>${p.unit ? esc(p.unit) : '<span style="color:var(--text-dim)">— belum diisi</span>'}</td>${adaDaerah ? '<td>' + esc(p.daerah || '') + '</td>' : ''}
+          ${ekstra.map(k => '<td>' + esc((p.extra || {})[k] || '') + '</td>').join('')}<td>${bicara(p.id)}×</td>
           <td class="aksi"><button class="btn btn-ghost" onclick="stdUbahPeserta('${p.id}')">Ubah</button>
           <button class="btn btn-ghost" onclick="stdHapusPeserta('${p.id}')">Hapus</button></td></tr>`).join('')}
-        </tbody></table>` : '<div class="empty">Belum ada peserta. Impor, tempel, atau tambah satu per satu — atau langsung ketik nama pembicara saat mencatat.</div>'}
+        </tbody></table>`; })() : '<div class="empty">Belum ada peserta. Impor, tempel, atau tambah satu per satu — atau langsung ketik nama pembicara saat mencatat.</div>'}
     </div>`;
   $id('stdBerkasPeserta').addEventListener('change', async e=>{
     const f = e.target.files[0]; e.target.value = ''; if(f) await stdImporPeserta(f);
@@ -5604,31 +5708,23 @@ function renderPesertaStd(){
   const enter = e => { if(e.key === 'Enter'){ e.preventDefault(); stdTambahPeserta(); } };
   $id('stdNamaBaru').addEventListener('keydown', enter);
   $id('stdUnitBaru').addEventListener('keydown', enter);
+  $id('stdDaerahBaru').addEventListener('keydown', enter);
 }
 
-function barisKePesertaStd(rows){
-  rows = rows.map(r => (r || []).map(c => rapi(String(c == null ? '' : c)))).filter(r => r.some(Boolean));
-  if(!rows.length) return [];
-  let iN = 0, iU = 1;
-  const h = rows[0].map(c => c.toLowerCase());
-  if(h.some(c => /nama/.test(c))){
-    iN = h.findIndex(c => /nama/.test(c));
-    const u = h.findIndex(c => /unit|satker|satuan kerja|instansi|kantor|bagian|bidang|asal|organisasi/.test(c) && !/^nama$/.test(c));
-    iU = u >= 0 && u !== iN ? u : (iN === 0 ? 1 : 0);
-    rows = rows.slice(1);
-  }
-  // kolom nomor urut di depan ("No") dilewati bila nama tak berjudul
-  if(!h.some(c => /nama/.test(c)) && rows.every(r => /^\d+$/.test(r[0] || ''))){ iN = 1; iU = 2; }
-  return rows.map(r => ({nama:r[iN] || '', unit:r[iU] || ''})).filter(p => p.nama);
-}
+const barisKePesertaStd = rows => bacaTabelPeserta(rows, 'unit');
 function terapkanPesertaStd(baru){
-  if(!baru.length){ toast('Tidak ada baris peserta yang terbaca. Kolom: Nama | Unit Kerja.'); return; }
+  if(!baru.length){ toast('Tidak ada baris peserta yang terbaca. Kolom: Nama | Unit Kerja | Daerah.'); return; }
   const s = sesiStd();
   let tambah = 0, ubah = 0;
   baru.forEach(p=>{
     const ada = s.peserta.find(x => normal(x.nama) === normal(p.nama));
-    if(ada){ if(p.unit && ada.unit !== p.unit){ ada.unit = p.unit; ubah++; } }
-    else { s.peserta.push({id:idBaru('p'), nama:p.nama, unit:p.unit}); tambah++; }
+    if(ada){ if(gabungDataPeserta(ada, p)) ubah++; }
+    else {
+      const baruP = {id:idBaru('p'), nama:p.nama, unit:p.unit || ''};
+      if(p.daerah) baruP.daerah = p.daerah;
+      if(p.extra && Object.keys(p.extra).length) baruP.extra = {...p.extra};
+      s.peserta.push(baruP); tambah++;
+    }
   });
   simpanN(); renderPesertaStd();
   toast(tambah + ' peserta ditambahkan' + (ubah ? ', ' + ubah + ' diperbarui' : '') + ' · total ' + s.peserta.length + '.');
@@ -5639,7 +5735,7 @@ async function stdImporPeserta(f){
     if(!(await pastikanXLSX())){ toast('Membaca Excel butuh internet. Alternatif: salin kolom dari Excel lalu tempel di kotak.'); return; }
     const wb = XLSX.read(await f.arrayBuffer(), {type:'array'});
     const ws = wb.Sheets[wb.SheetNames[0]];
-    terapkanPesertaStd(barisKePesertaStd(XLSX.utils.sheet_to_json(ws, {header:1, defval:''})));
+    terapkanPesertaStd(barisKePesertaStd(XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false})));
   }catch(e){ toast('Gagal membaca berkas: ' + e.message); }
 }
 function stdTempelPesertaOk(){
@@ -5648,14 +5744,14 @@ function stdTempelPesertaOk(){
   terapkanPesertaStd(barisKePesertaStd(teksKeBaris(t)));
 }
 function stdTambahPeserta(){
-  const n = $id('stdNamaBaru'), u = $id('stdUnitBaru');
+  const n = $id('stdNamaBaru'), u = $id('stdUnitBaru'), d = $id('stdDaerahBaru');
   if(!n.value.trim()){ sorotiKolom(n, 'Nama peserta belum diisi.'); return; }
-  terapkanPesertaStd([{nama:rapi(n.value), unit:rapi(u.value)}]);
+  terapkanPesertaStd([{nama:rapi(n.value), unit:rapi(u.value), daerah:kanonDaerah(d.value), extra:{}}]);
   fokusNanti('stdNamaBaru', 50);
 }
 function stdSalinPeserta(){
   const dari = N.sesi.find(x => x.id === $id('stdSalinDari').value); if(!dari) return;
-  terapkanPesertaStd(dari.peserta.map(p => ({nama:p.nama, unit:p.unit})));
+  terapkanPesertaStd(dari.peserta.map(p => ({nama:p.nama, unit:p.unit, daerah:p.daerah || '', extra:{...(p.extra || {})}})));
 }
 /* Peserta contoh — buat coba-coba alur pencatatan tanpa perlu impor Excel
    dulu. Aman: cuma menambah (lewat terapkanPesertaStd yang tidak pernah
@@ -5676,6 +5772,7 @@ function stdUbahPeserta(pid){
     <div class="rk-lbl" style="margin-top:0">Ubah peserta</div>
     <label class="fl" style="margin-top:12px">Nama</label><input class="field" id="spN" value="${esc(p.nama)}">
     <label class="fl" style="margin-top:12px">Unit kerja</label><input class="field" id="spU" value="${esc(p.unit)}">
+    <label class="fl" style="margin-top:12px">Daerah (opsional)</label><input class="field" id="spD" value="${esc(p.daerah || '')}">
     <div style="display:flex;gap:10px;margin-top:18px">
       <button class="btn btn-primary" onclick="stdSimpanPeserta('${pid}')">Simpan</button>
       <button class="btn btn-ghost" style="margin-left:auto" onclick="tutupModal()">Batal</button></div>`;
@@ -5686,6 +5783,8 @@ function stdSimpanPeserta(pid){
   const nama = rapi($id('spN').value);
   if(!nama){ sorotiKolom($id('spN'), 'Nama tidak boleh kosong.'); return; }
   p.nama = nama; p.unit = rapi($id('spU').value);
+  const dae = kanonDaerah($id('spD').value);
+  if(dae) p.daerah = dae; else delete p.daerah;
   s.entri.forEach(e => { if(e.pid === pid){ e.nama = p.nama; e.unit = p.unit; } });
   simpanN(); tutupModal(); renderPesertaStd();
 }
@@ -5908,7 +6007,9 @@ async function stdEksporPDF(sid){
   };
   kepala();
   // pembicara yang pernah bicara tapi sudah dihapus dari daftar tetap harus tercantum
-  const barisP = s.peserta.map(p => ({nama:p.nama, unit:p.unit, n:stat.get(p.id) || 0}));
+  // PDF: tata letak kolom tetap — daerah & data tambahan (mis. NIP) digabung ke kolom Unit Kerja
+  const barisP = s.peserta.map(p => ({nama:p.nama, n:stat.get(p.id) || 0,
+    unit:[p.unit, p.daerah, ...Object.entries(p.extra || {}).map(([k, v]) => k + ': ' + v)].filter(Boolean).join(' · ')}));
   const yatim = new Map();
   s.entri.forEach(e=>{ if(!s.peserta.some(p => p.id === e.pid)){
     const k = e.pid; if(!yatim.has(k)) yatim.set(k, {nama:e.nama || '(tanpa nama)', unit:e.unit || '', n:0}); yatim.get(k).n++; } });
@@ -5975,8 +6076,8 @@ p{margin:0 0 6pt;line-height:1.4}.k{color:#6e7387;font-size:9.5pt}</style></head
 <tr><td class="k" style="padding:2px 16px 2px 0">Peserta</td><td><b>${s.peserta.length} orang</b> · ${stat.size} berbicara · ${s.entri.length} catatan</td></tr>
 </table>
 <h2>Daftar Peserta</h2>
-<table style="border-collapse:collapse;width:100%"><tr><th ${th}>No</th><th ${th}>Nama</th><th ${th}>Unit Kerja</th><th ${th}>Bicara</th></tr>
-${s.peserta.map((p,i)=>`<tr><td ${td}>${i+1}</td><td ${td}>${esc(p.nama)}</td><td ${td}>${esc(p.unit || '—')}</td><td ${td}>${stat.get(p.id) || 0}×</td></tr>`).join('')}
+<table style="border-collapse:collapse;width:100%"><tr><th ${th}>No</th><th ${th}>Nama</th><th ${th}>Unit Kerja</th>${s.peserta.some(p => p.daerah) ? `<th ${th}>Daerah</th>` : ''}${kolomTambahanPeserta(s.peserta).map(k => `<th ${th}>${esc(k)}</th>`).join('')}<th ${th}>Bicara</th></tr>
+${s.peserta.map((p,i)=>`<tr><td ${td}>${i+1}</td><td ${td}>${esc(p.nama)}</td><td ${td}>${esc(p.unit || '—')}</td>${s.peserta.some(x => x.daerah) ? `<td ${td}>${esc(p.daerah || '—')}</td>` : ''}${kolomTambahanPeserta(s.peserta).map(k => `<td ${td}>${esc((p.extra || {})[k] || '—')}</td>`).join('')}<td ${td}>${stat.get(p.id) || 0}×</td></tr>`).join('')}
 </table>
 <h2>Transkrip Percakapan</h2>
 ${s.entri.map((e,i)=>{ const p = penutur(s, e);
@@ -6953,7 +7054,7 @@ async function sinkronNilai(){
   if(PANGGUNG || !nilaiTerbuka()) return;
   if(ligaServer === null) await cekServer();
   if(!ligaServer) return;
-  try{ await api('/api/liga/nilai-buka', {tanggal:L.nilaiBuka, peserta:L.roster, sudah:nilaiHari().map(x => x.pesertaId)}); }catch(e){}
+  try{ await api('/api/liga/nilai-buka', {tanggal:L.nilaiBuka, peserta:pesertaUntukHP(L.roster), sudah:nilaiHari().map(x => x.pesertaId)}); }catch(e){}
 }
 async function tarikNilai(){
   if(PANGGUNG || !ligaServer || !nilaiTerbuka()) return;

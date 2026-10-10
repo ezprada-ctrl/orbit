@@ -364,8 +364,9 @@ sebelum kesimpulan WI.
 
 1. Dashboard → **Liga Inovasi** → tab **Daftar Peserta**
 2. Isi **nama kelas** (mis. `Angkatan II · Kelas B`) — ini nama arsipnya nanti
-3. Impor Excel berkolom **nama | daerah**. Tanpa internet: salin dua kolom itu di
-   Excel, tempel di kotak tempelan, klik **Tambahkan dari tempelan**
+3. Impor Excel berkolom **Nama | Unit Kerja | Daerah** (standar yang sama di semua mode; hanya Nama yang wajib,
+   kolom kosong boleh dilewati, urutan bebas, kolom lain seperti NIP ikut terbaca dan ditampilkan).
+   Tanpa internet: salin kolomnya di Excel, tempel di kotak tempelan, klik **Tambahkan dari tempelan**
 4. Salah ejaan nama? Klik **Ubah** — semua bid orang itu ikut, tidak pecah
 5. Nama daerah diseragamkan otomatis ke nama wilayah resmi (`Jawa Barat` → `Provinsi Jawa Barat`,
    `DKI Jakarta`, `Kab. Sleman`, `Jatim`, dst.). Yang ambigu atau tidak dikenal (mis. `Bandung`)
@@ -471,7 +472,7 @@ Untuk rapat, pelatihan lain, atau forum yang tidak memakai game.
 
 - **Beralih mode:** ikon roda gigi (Setelan) di kanan atas → pilih *Mode Standar* → konfirmasi. Mode yang dipilih diingat browser.
 - **Data gamifikasi dibekukan, tidak dihapus.** Forum & Liga Inovasi lanjut persis dari titik terakhir saat kembali ke Mode Gamifikasi. Tidak ada skor yang dihitung di Mode Standar. Peralihan ditolak selama jendela bid Liga masih terbuka.
-- **Peserta:** tab *Peserta* → impor Excel/CSV (kolom Nama | Unit Kerja), tempel dari Excel, salin dari sesi lain, atau tambah satu per satu. Nama yang diketik saat mencatat tapi belum terdaftar otomatis jadi peserta baru (format `Nama (Unit)` ikut terbaca).
+- **Peserta:** tab *Peserta* → impor Excel/CSV (kolom Nama | Unit Kerja | Daerah, sama seperti Liga; kolom lain seperti NIP ikut terbaca), tempel dari Excel, salin dari sesi lain, atau tambah satu per satu. Nama yang diketik saat mencatat tapi belum terdaftar otomatis jadi peserta baru (format `Nama (Unit)` ikut terbaca).
 - **Mencatat:** tab *Percakapan* → pilih pembicara → ketik atau **Dikte** → Ctrl+Enter. Pembicara tetap terpilih agar ucapan panjang bisa didikte beberapa potong.
 - **Transkrip luar:** bagian *Masukkan transkrip dari luar* menerima chat WhatsApp/Zoom, berkas `.vtt` Teams/Zoom, atau teks `Nama: isi`.
 - **Ekspor:** tombol *Unduh PDF* / *Unduh Word* (sampul → daftar peserta → transkrip bernomor).
