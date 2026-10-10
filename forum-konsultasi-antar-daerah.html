@@ -380,6 +380,10 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
    ============================================================ */
 .screen{display:none}
 .screen.active{display:block;animation:enter .45s var(--ease) both}
+/* Layar penuh Liga: elemen yang di-fullscreen-kan tidak mewarisi latar body,
+   jadi tanpa ini latarnya hitam bawaan browser dan teks tema terang tak terbaca. */
+#scr-liga:fullscreen{background:var(--bg);color:var(--text);overflow:auto;padding:28px 48px;box-sizing:border-box}
+#scr-liga:-webkit-full-screen{background:var(--bg);color:var(--text);overflow:auto;padding:28px 48px;box-sizing:border-box}
 @keyframes enter{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
 @keyframes pop{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
 
