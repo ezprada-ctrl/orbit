@@ -84,7 +84,10 @@ body{
   -webkit-font-smoothing:antialiased;
   transition:background .4s var(--ease),color .4s var(--ease);
   overflow-x:hidden;
+  -webkit-user-select:none;user-select:none;   /* tampilan seperti aplikasi: teks tidak ikut ter-blok saat diklik/diseret */
 }
+/* kolom isian tetap bisa dipilih & disalin */
+input,textarea,select,[contenteditable="true"]{-webkit-user-select:text;user-select:text}
 /* lapisan gradasi halus di latar — memberi "kehangatan" tanpa ramai */
 body::before{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
