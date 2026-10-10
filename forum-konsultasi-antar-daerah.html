@@ -318,6 +318,12 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
    dari `draw` ikut lepas begitu animasinya diganti. */
 .jaring .jl-alir-saja{animation:alir 24s linear infinite;opacity:.32}
 @keyframes alir{to{stroke-dashoffset:-140}}
+@keyframes alirBalik{to{stroke-dashoffset:140}}
+/* Arah aliran mengikuti panah: balik bila panah di ujung awal garis, diam bila dua arah */
+.jaring .jl-alir.jl-balik{animation:draw 1s var(--ease) both, alirBalik 24s linear infinite}
+.jaring .jl-alir-saja.jl-balik{animation:alirBalik 24s linear infinite;opacity:.32}
+.jaring .jl-alir.jl-dua{animation:draw 1s var(--ease) both}
+.jaring .jl-alir-saja.jl-dua{animation:none;opacity:.32}
 .jaring .jn{animation:pop .5s var(--ease) both}
 .jaring text{fill:var(--text);font-size:15px;font-weight:700;font-family:var(--font)}
 .jaring .nd-host{fill:var(--accent-2)}
@@ -2342,7 +2348,10 @@ function renderJaring(daerah, opt){
     const mundur = n => jari(n) + (daerah.get(n).angkat ? 8 : 3);
     const x1 = pos[a].x + ux*mundur(a), y1 = pos[a].y + uy*mundur(a);
     const x2 = pos[b].x - ux*mundur(b), y2 = pos[b].y - uy*mundur(b);
-    garis += `<line class="jl${o.urut ? '' : ' jl-alir'}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}"
+    // aliran putus-putus harus searah panah: garis selalu digambar a → b, jadi bila panahnya
+    // hanya di ujung a ("jl-balik") aliran dibalik; panah dua arah → tanpa aliran ("jl-dua")
+    const arahAlir = keA && keB ? ' jl-dua' : keA ? ' jl-balik' : '';
+    garis += `<line class="jl${o.urut ? '' : ' jl-alir'}${arahAlir}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}"
       x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
       ${keB ? 'marker-end="url(#jPanah)"' : ''} ${keA ? 'marker-start="url(#jPanahBalik)"' : ''}
       style="stroke-width:${Math.min(3.6, 1 + bobot*0.8).toFixed(1)};animation-delay:${jeda}ms"/>`;
