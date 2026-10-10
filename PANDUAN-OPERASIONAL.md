@@ -323,6 +323,7 @@ Kendali otomatis kembali ke PTP. Siap untuk masalah berikutnya.
 
 ## 11. Pantangan
 
+- ❌ **Jangan klik "Mulai Kelas Baru" sebelum PDF risalah dan Excel Liga diunduh.** Tombol di dashboard ini mengosongkan forum DAN Liga sekaligus, tidak bisa dikembalikan
 - ❌ **Jangan buka lewat klik ganda file** kalau mau pakai Dikte. Harus lewat `localhost`
 - ❌ **Jangan kejar verbatim.** Cukup satu kalimat inti per penanggap. Transkrip lengkap justru membuat risalah jadi jelek
 - ❌ **Jangan biarkan dua orang bicara bersamaan** saat Dikte menyala

@@ -1331,6 +1331,8 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
         onclick="kembaliDariContoh()" title="Kembalikan data sesi asli, sebelum data contoh dimuat">↺ Kembali ke Data Asli</button>
       <button class="btn btn-ghost" id="btnDataContoh" style="margin-left:auto" onclick="muatContoh(12,50)"
         title="Ganti isi sesi dengan data contoh untuk melihat tampilan saat penuh — data asli disimpan otomatis dan bisa dikembalikan">Data Contoh</button>
+      <button class="btn btn-ghost" style="color:var(--danger)" onclick="mulaiKelasBaru()"
+        title="Kosongkan forum dan Liga untuk kelas berikutnya — unduh PDF risalah dan Excel Liga dulu">Mulai Kelas Baru</button>
     </div>
 
     <!-- Pemindahan data antar-laptop -->
@@ -5087,6 +5089,21 @@ async function kelasBaru(){
   toast('Liga kosong, siap untuk kelas baru.');
 }
 
+/* Tombol tunggal di dashboard: mulai kelas berikutnya dari nol — forum DAN Liga.
+   (Tombol "Mulai kelas baru" di tab Arsip & Ekspor Liga hanya mengosongkan Liga.) */
+async function mulaiKelasBaru(){
+  if(!confirm('Mulai kelas baru dari awal?\n\nSEMUA data kelas ini dikosongkan dari browser: masalah, tanggapan, kesimpulan, serta peserta, bid, dan skor Liga.\nPastikan PDF risalah dan Excel Liga sudah diunduh. (Arsip Liga di folder arsip-liga tetap ada.)')) return;
+  await arsipkanLiga(true);         // salinan terakhir Liga kelas lama ke disk
+  S = {tanggal:new Date().toLocaleDateString('sv'), mode:'PTP', aktifId:null, masalah:[]};
+  prevStats = {m:0, d:0, t:0};
+  simpan();
+  L = ligaKosong(); ligaPilihan = new Set(); ligaGiliran = null;
+  arsipKeadaan = '';
+  simpanLiga(); sinkronJendela();
+  setMode('PTP'); go('welcome');
+  toast('Kelas baru siap dimulai dari awal.');
+}
+
 // Ctrl+Enter di kolom keypoint manual = catat bid (sama dengan kebiasaan di kolom tanggapan)
 document.addEventListener('keydown', e=>{
   if((e.ctrlKey || e.metaKey) && e.key === 'Enter' && e.target && e.target.id === 'lgBidKp'){
@@ -7138,7 +7155,7 @@ async function daftarCek(){
   const hariIniISO = new Date().toISOString().slice(0, 10);
   if(S.masalah.length && S.tanggal !== hariIniISO)
     tambah('warn', 'Masih ada ' + S.masalah.length + ' masalah dari sesi ' + bulanID(tanggalLokal(S.tanggal)),
-      'Bila ini kelas baru: unduh PDF risalahnya dulu untuk arsip.', {label:'Ke rekap', fn:"tutupModal();bukaRekap()"});
+      'Bila ini kelas baru: unduh PDF risalahnya dulu, lalu tekan Mulai Kelas Baru di dashboard.', {label:'Ke rekap', fn:"tutupModal();bukaRekap()"});
   else tambah('ok', 'Forum siap', S.masalah.length ? S.masalah.length + ' masalah tercatat hari ini.' : 'Belum ada masalah — siap untuk masalah pertama.');
   if(!L.roster.length) tambah('warn', 'Daftar peserta Liga Inovasi kosong', 'Impor Excel nama | daerah bila kelas ini memakai Liga Inovasi dan penilaian sesi.',
     {label:'Buka Daftar Peserta', fn:"tutupModal();ligaTabAktif='peserta';go('liga')"});
