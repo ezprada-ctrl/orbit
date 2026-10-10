@@ -6562,11 +6562,18 @@ function htmlTenggat(p){
     ${[0, 1, 2, 3, 5].map(n => `<button class="btn btn-ghost${(p.tenggatMenit || 0) === n ? ' on' : ''}" onclick="aturTenggat(${n})">${n ? n + ' menit' : 'Tanpa'}</button>`).join('')}
     <span id="lgSisa"></span></div>`;
 }
-if(!PANGGUNG) setInterval(()=>{
-  const el = $id('lgSisa'); if(!el) return;
+function segarkanSisaBid(){
   const s = sisaDetik(putaranTerbuka());
-  el.innerHTML = s === null ? '' : s > 0 ? 'sisa <b>' + mmss(s) + '</b>' : '<b>Waktu habis</b> — tutup jendela bid bila sudah cukup';
-}, 1000);
+  const el = $id('lgSisa');
+  if(el) el.innerHTML = s === null ? '' : s > 0 ? 'sisa <b>' + mmss(s) + '</b>' : '<b>Waktu habis</b> — tutup jendela bid bila sudah cukup';
+  const besar = $id('lgSisaBesar');
+  if(besar){
+    besar.innerHTML = s === null ? '' : s > 0 ? mmss(s) + '<small>sisa waktu kirim bid</small>' : 'Waktu habis';
+    besar.classList.toggle('kritis', s !== null && s > 0 && s <= 10);
+    besar.classList.toggle('habis', s === 0);
+  }
+}
+if(!PANGGUNG) setInterval(segarkanSisaBid, 1000);
 
 /* --- papan peringkat (dipakai layar Liga, panggung & pengumuman) --- */
 function htmlPapanIsi(rows){
@@ -7459,4 +7466,6 @@ async function cekSiapKelas(){
   }
   siapkanLanjut();
 })();
-</scr
+</script>
+</body>
+</html>
