@@ -636,8 +636,20 @@ select.field{padding:13px 14px;font-size:15px;font-weight:600}
 /* Keadaan merekam sengaja dibuat pekat, bukan bertinta samar: di mode terang
    tint lembut nyaris tak terbedakan dari tombol biasa, sehingga operator tidak
    pernah yakin mikrofonnya sedang hidup atau tidak. */
-.mic.dengar{background:var(--accent-2);border-color:var(--accent-2);color:var(--on-accent-2);
-  animation:dengar 1.5s ease-in-out infinite}
+/* Teal, sengaja BUKAN hijau --accent-2 yang dipakai tombol "Sedang bicara":
+   dua penanda "sedang hidup" itu bisa tampil berdampingan dan harus terbedakan. */
+:root[data-theme="dark"]{--rekam:#2DD4BF;--on-rekam:#03201C}
+:root[data-theme="light"]{--rekam:#0B7F73;--on-rekam:#FFFFFF}
+.mic.dengar{position:relative;overflow:hidden;isolation:isolate;
+  background:var(--rekam);border-color:var(--rekam);color:var(--on-rekam);
+  animation:dengarGlow 1.8s ease-in-out infinite}
+.mic.dengar::after{content:"";position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.38) 50%,transparent 70%);
+  transform:translateX(-120%);animation:bicaraKilau 2.4s ease-in-out infinite}
+@keyframes dengarGlow{
+  0%,100%{box-shadow:0 0 0 0 var(--rekam),0 0 10px -2px var(--rekam)}
+  50%{box-shadow:0 0 0 5px transparent,0 0 26px 2px var(--rekam)}}
+@media (prefers-reduced-motion:reduce){.mic.dengar,.mic.dengar::after{animation:none}}
 /* Teks yang masih "didengar" ditampilkan DI LUAR kolom isian. Kalau ditaruh di
    dalam kolom, ekornya ditulis ulang terus-menerus sehingga kursor terlempar ke
    ujung dan kolom tidak bisa disunting sambil dikte berjalan. */
@@ -666,7 +678,6 @@ select.field{padding:13px 14px;font-size:15px;font-weight:600}
   50%{box-shadow:0 0 0 5px transparent,0 0 26px 2px var(--accent-2)}}
 @keyframes bicaraKilau{0%{transform:translateX(-120%)}60%,100%{transform:translateX(120%)}}
 @media (prefers-reduced-motion:reduce){.lg-bicara,.lg-bicara::after{animation:none}}
-@keyframes dengar{0%,100%{box-shadow:0 0 0 0 var(--accent-2-soft)}55%{box-shadow:0 0 0 7px transparent}}
 
 
 .toast{position:fixed;left:50%;bottom:34px;transform:translate(-50%,24px);z-index:80;
@@ -1383,7 +1394,7 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
         <label class="fl" for="inDesk">Uraian masalah</label>
         <button class="mic" id="micDesk" type="button" title="Mulai dikte suara">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"/><path d="M18 11a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V22h2v-3.1A8 8 0 0 0 20 11h-2z"/></svg>
-          Dikte
+          <span class="mic-t">Dikte</span>
         </button>
       </div>
       <textarea class="field" id="inDesk" rows="6" placeholder="Ceritakan kondisi yang dihadapi di daerah..."></textarea>
@@ -1417,7 +1428,7 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
             <label class="fl" for="tgIsi">Isi tanggapan / praktik yang diterapkan</label>
             <button class="mic" id="micTg" type="button" title="Mulai dikte suara">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"/><path d="M18 11a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V22h2v-3.1A8 8 0 0 0 20 11h-2z"/></svg>
-              Dikte
+              <span class="mic-t">Dikte</span>
             </button>
           </div>
           <textarea class="field" id="tgIsi" rows="2" style="min-height:56px"
@@ -1458,7 +1469,7 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
     <div class="sec-head"><h3>Babak 3 · Kesimpulan Forum</h3><div class="line"></div>
       <button class="mic" id="micWi" type="button" title="Mulai dikte suara">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"/><path d="M18 11a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V22h2v-3.1A8 8 0 0 0 20 11h-2z"/></svg>
-        Dikte
+        <span class="mic-t">Dikte</span>
       </button>
     </div>
     <div class="wi-input">
@@ -1574,7 +1585,7 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
               <label class="fl" for="stdIsi">Isi pembicaraan</label>
               <button class="mic" id="micStd" type="button" title="Mulai dikte suara">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z"/><path d="M18 11a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V22h2v-3.1A8 8 0 0 0 20 11h-2z"/></svg>
-                Dikte
+                <span class="mic-t">Dikte</span>
               </button>
             </div>
             <textarea class="field" id="stdIsi" rows="2" style="min-height:56px"
@@ -2649,6 +2660,7 @@ function pasangDikte(inputId, btnId, opsi){
   if(!SR_API){ btn.style.display = 'none'; return; }
 
   let rec = null, aktif = false;
+  const lbl = btn.querySelector('.mic-t');
 
   // keterangan "sedang didengar", dibuat otomatis di bawah tiap kolom berdikte
   const kap = document.createElement('div');
@@ -2816,6 +2828,7 @@ function pasangDikte(inputId, btnId, opsi){
     perluSegar = false; adaSementara = false;
     dikteMulai = Date.now();
     btn.classList.add('dengar');
+    if(lbl) lbl.textContent = 'Merekam…';
     btn.title = 'Berhenti merekam';
     kap.textContent = 'Mendengarkan…  ·  00:00';
     kap.classList.add('on');
@@ -2843,6 +2856,7 @@ function pasangDikte(inputId, btnId, opsi){
     aktif = false;
     buangSesi();
     btn.classList.remove('dengar');
+    if(lbl) lbl.textContent = 'Dikte';
     btn.title = 'Mulai dikte suara';
     if(pesan){
       /* Kegagalan harus tetap terlihat. Notifikasi sekejap mudah terlewat saat
