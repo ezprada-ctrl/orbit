@@ -78,7 +78,7 @@ di bagian atas layar. Fitur lain tetap normal — **hanya dikte** yang bermasala
 - [ ] **Pastikan internet nyala.** Dua hal butuh internet: tombol Dikte, dan unduh PDF
 - [ ] Klik tombol **Dikte** sekali, lalu klik **Allow** saat browser bertanya. Cukup sekali, tidak ditanya lagi
 - [ ] Coba dulu pakai tombol **"Data Contoh"** — lihat tampilannya saat penuh, biar tidak kaget di depan kelas
-- [ ] Lalu klik **"Sesi Baru"** untuk mengosongkan. Kelas harus mulai dari nol
+- [ ] Lalu klik **"↺ Kembali ke Data Asli"** supaya data contoh hilang. Kelas harus mulai dari data asli yang bersih
 - [ ] **Atur tema**: ikon matahari/bulan di pojok kanan atas. Ruangan gelap → mode gelap. Ruangan terang → mode terang
 - [ ] Colok proyektor, cek tulisan terbaca dari bangku paling belakang
 - [ ] **Terakhir: klik Cek Siap Kelas** (layar pembuka atau dashboard). Semua hijau = siap. Yang kuning/merah punya tombol perbaikan (lihat Bagian 16)
@@ -323,7 +323,6 @@ Kendali otomatis kembali ke PTP. Siap untuk masalah berikutnya.
 
 ## 11. Pantangan
 
-- ❌ **Jangan klik "Sesi Baru" sebelum PDF diunduh.** Semua data hilang permanen, tidak bisa dikembalikan
 - ❌ **Jangan buka lewat klik ganda file** kalau mau pakai Dikte. Harus lewat `localhost`
 - ❌ **Jangan kejar verbatim.** Cukup satu kalimat inti per penanggap. Transkrip lengkap justru membuat risalah jadi jelek
 - ❌ **Jangan biarkan dua orang bicara bersamaan** saat Dikte menyala
@@ -439,7 +438,7 @@ Bila liga lebih dari satu hari, tampilkan tiap akhir hari.
 
 ### Data liga & sertifikat
 
-- Liga **tidak ikut terhapus** oleh "Sesi Baru" — skor menumpuk selama durasi liga
+- Skor liga menumpuk selama durasi liga; dikosongkan hanya lewat **Mulai kelas baru** (tab Arsip & Ekspor)
 - Tiap perubahan otomatis diarsip ke folder **`arsip-liga`** di sebelah aplikasi (satu berkas JSON per kelas)
 - Setelah peringkat akhir diumumkan: tab **Arsip & Ekspor** → **Unduh Excel kelas ini** → serahkan ke panitia.
   Isinya: Ringkasan (termasuk Peserta Terbaik), Peringkat, Bid per Masalah (keypoint,
