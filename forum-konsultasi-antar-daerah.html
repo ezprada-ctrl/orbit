@@ -1650,21 +1650,6 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
           </div>
         </div>
       </div>
-
-      <details class="std-card" style="margin-top:18px">
-        <summary style="cursor:pointer;font-weight:700">Masukkan transkrip dari luar (chat WhatsApp/Zoom, transkrip Teams/Zoom, atau teks)</summary>
-        <p class="sub" style="margin-top:12px">Satu baris per ucapan dengan format <b>Nama: isi</b> atau <b>Nama (Unit Kerja): isi</b>.
-          Cap waktu WhatsApp/Zoom dan berkas <code>.vtt</code> dikenali otomatis. Pembicara yang belum terdaftar
-          ditambahkan ke daftar peserta. Ucapan beruntun dari orang yang sama digabung.</p>
-        <p class="sub" style="margin-top:-4px"><b>Dari Teams:</b> buka rekaman rapat → Transkrip → Unduh <code>.vtt</code>, lalu pilih berkasnya di bawah.
-          Bisa juga menyalin langsung dari panel transkrip lalu menempelnya di kotak ini.</p>
-        <textarea class="field" id="stdTempel" rows="6" placeholder="Budi Santoso: Menurut saya jadwalnya perlu dimajukan.&#10;Rina (Bagian Umum): Setuju, ruangannya tersedia hari Senin."></textarea>
-        <div class="std-bar" style="margin:12px 0 0">
-          <button class="btn btn-ghost" onclick="$id('stdBerkasTranskrip').click()">Pilih berkas .txt / .vtt</button>
-          <button class="btn btn-kirim" style="margin-left:auto" onclick="stdImporTempel()">Tambahkan ke percakapan <span class="kirim-ik">↵</span></button>
-          <input type="file" id="stdBerkasTranskrip" accept=".txt,.vtt,.srt,text/plain" style="display:none">
-        </div>
-      </details>
     </div>
 
     <div id="stdPeserta"></div>
@@ -6351,7 +6336,7 @@ function bukaSetelan(){
       <button class="${modeApp==='standar'?'on':''}" onclick="gantiModeApp('standar')">
         <b>Mode Standar</b>
         <span>Notulen percakapan untuk rapat, pelatihan lain, atau forum tanpa game: catat siapa bicara
-        apa secara berurutan (ketik/dikte/tempel transkrip), lalu unduh PDF atau Word.</span>
+        apa secara berurutan (ketik atau dikte), lalu unduh PDF atau Word.</span>
       </button>
     </div>
     <p style="color:var(--text-dim);font-size:13.5px;line-height:1.55;margin-top:14px">
@@ -6762,80 +6747,6 @@ function stdHapusPeserta(pid){
   s.peserta = s.peserta.filter(x => x.id !== pid);
   simpanN(); renderPesertaStd();
 }
-
-/* ---------------- Transkrip dari luar ---------------- */
-/* Mengenali: WebVTT (Teams/Zoom), "<v Nama>isi", chat WhatsApp
-   ("[25/09/26 10.15.02] Nama: isi" / "25/09/26 10.15 - Nama: isi"),
-   chat Zoom ("10:15:02 From Nama to Everyone: isi"), dan "Nama: isi".
-   Baris tanpa nama dianggap lanjutan ucapan sebelumnya.
-   Transkrip Teams ikut dikenali: berkas .vtt (termasuk baris kode penanda yang
-   disisipkan Teams), dan salinan dari panel transkrip / berkas Word-nya yang
-   berbentuk "Nama  0:05" lalu isi ucapan di baris berikutnya. Label "(Guest)" /
-   "(Unverified)" di nama akun dibuang, supaya tidak terbaca sebagai unit kerja. */
-const RE_KODE_CUE = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}(\/\d+(-\d+)*)?$/i;
-const RE_KEPALA_TEAMS = /^([^\d:]{2,70}?)\s+(\d{1,2}:\d{1,2}(:\d{1,2})?)$/;
-const RE_LABEL_AKUN = /\s*[\(\[]\s*(guest|tamu|unverified|external|eksternal|tidak terverifikasi|belum terverifikasi)\s*[\)\]]/gi;
-function uraiTranskrip(t){
-  const hasil = [];
-  const dorong = (nama, isi) => {
-    nama = rapi((nama || '').replace(RE_LABEL_AKUN, '')); isi = rapi(isi || '');
-    if(!isi) return;
-    const akhir = hasil[hasil.length-1];
-    if(akhir && normal(akhir.nama) === normal(nama)) akhir.isi += ' ' + isi;
-    else hasil.push({nama, isi});
-  };
-  const semuaBaris = t.replace(/^﻿/, '').split(/\r?\n/);
-  const tak = semuaBaris.map(b => b.trim()).filter(Boolean);
-  // gaya Teams (nama + jam, isi di baris berikutnya): baru dipakai bila memang dominan, supaya
-  // kalimat biasa yang kebetulan berakhir dengan jam ("rapat mulai 10:30") tidak dikira pembicara
-  const gayaTeams = tak.filter(b => RE_KEPALA_TEAMS.test(b)).length >= 2
-    && tak.filter(b => RE_KEPALA_TEAMS.test(b)).length >= tak.length * 0.2;
-  // di berkas VTT, baris tanpa <v Nama> selalu lanjutan ucapan — "Catatan: ..." bukan pembicara baru
-  const gayaVtt = /^WEBVTT/m.test(t) || /<v\s+[^>]+>/i.test(t);
-  let pembicara = null;
-  semuaBaris.forEach(b=>{
-    b = b.trim();
-    if(!b || /^WEBVTT/i.test(b) || /-->/.test(b) || /^\d+$/.test(b) || /^(NOTE|STYLE)\b/.test(b) || RE_KODE_CUE.test(b)) return;
-    let m = b.match(/^<v\s+([^>]+)>(.*?)(<\/v>)?$/i);
-    if(m){ pembicara = m[1]; dorong(m[1], m[2].replace(/<[^>]+>/g,'')); return; }
-    if(gayaVtt){ dorong(pembicara, b.replace(/<[^>]+>/g,'')); return; }
-    if(gayaTeams){
-      m = b.match(RE_KEPALA_TEAMS);
-      if(m){ pembicara = m[1]; return; }
-      if(pembicara !== null){ dorong(pembicara, b); return; }
-    }
-    b = b.replace(/^\[?\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4},?\s+\d{1,2}[.:]\d{2}([.:]\d{2})?(\s?[AP]M)?\]?\s*-?\s*/i, '')
-         .replace(/^\[?\d{1,2}[.:]\d{2}([.:]\d{2})?\]?\s*-?\s*/, '')
-         .replace(/^From\s+(.+?)\s+to\s+[^:]+:/i, '$1:');
-    m = b.match(/^([^:]{1,80}?):\s*(.+)$/);
-    if(m && !/^https?$/i.test(m[1])) dorong(m[1], m[2]);
-    else if(hasil.length) hasil[hasil.length-1].isi += ' ' + b;
-    else dorong('', b);
-  });
-  return hasil;
-}
-function stdImporTranskrip(teks){
-  const daftar = uraiTranskrip(teks);
-  if(!daftar.length){ toast('Tidak ada ucapan yang terbaca dari transkrip.'); return false; }
-  const s = sesiStd(), awal = s.peserta.length, t0 = new Date().toISOString();
-  daftar.forEach(d=>{
-    const p = pesertaDariTeks(s, d.nama || 'Tanpa nama');
-    s.entri.push({id:idBaru('e'), pid:p.id, nama:p.nama, unit:p.unit, isi:d.isi, waktu:t0, impor:true});
-  });
-  simpanN(); renderFeedStd(); renderPembicara();
-  const baru = s.peserta.length - awal;
-  toast(daftar.length + ' ucapan ditambahkan' + (baru ? ' · ' + baru + ' pembicara baru masuk daftar peserta' : '') + '.');
-  return true;
-}
-function stdImporTempel(){
-  const el = $id('stdTempel');
-  if(!el.value.trim()){ sorotiKolom(el, 'Tempel dulu transkripnya.'); return; }
-  if(stdImporTranskrip(el.value)) el.value = '';
-}
-$id('stdBerkasTranskrip').addEventListener('change', async e=>{
-  const f = e.target.files[0]; e.target.value = ''; if(!f) return;
-  try{ stdImporTranskrip(await f.text()); }catch(err){ toast('Gagal membaca berkas: ' + err.message); }
-});
 
 /* ---------------- Cari & arsip (knowledge base) ---------------- */
 let stdQ = '';

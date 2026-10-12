@@ -525,7 +525,6 @@ Untuk rapat, pelatihan lain, atau forum yang tidak memakai game.
 - **Data gamifikasi dibekukan, tidak dihapus.** Forum & Liga Inovasi lanjut persis dari titik terakhir saat kembali ke Mode Gamifikasi. Tidak ada skor yang dihitung di Mode Standar. Peralihan ditolak selama jendela bid Liga masih terbuka.
 - **Peserta:** tab *Peserta* → impor Excel/CSV (kolom Nama | Unit Kerja | Daerah, sama seperti Liga; kolom lain seperti NIP ikut terbaca), tempel dari Excel, salin dari sesi lain, atau tambah satu per satu. Nama yang diketik saat mencatat tapi belum terdaftar otomatis jadi peserta baru (format `Nama (Unit)` ikut terbaca).
 - **Mencatat:** tab *Percakapan* → pilih pembicara → ketik atau **Dikte** → Ctrl+Enter. Pembicara tetap terpilih agar ucapan panjang bisa didikte beberapa potong.
-- **Transkrip luar:** bagian *Masukkan transkrip dari luar* menerima chat WhatsApp/Zoom, berkas `.vtt` Teams/Zoom, atau teks `Nama: isi`.
 - **Ekspor:** tombol *Unduh PDF* / *Unduh Word* (sampul → daftar peserta → transkrip bernomor).
 - **Knowledge base:** tab *Cari & Arsip* menelusuri seluruh sesi (isi, pembicara, unit, judul). Klik hasil untuk lompat ke catatannya.
 - **Cadangan:** data Mode Standar hanya di browser laptop itu — rutin klik *Simpan cadangan (JSON)* ke OneDrive; *Muat cadangan* menggabungkan arsip di laptop lain.
