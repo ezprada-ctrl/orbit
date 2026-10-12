@@ -21,3 +21,7 @@ cadangan-sebelum-update/
 # Tanda versi rilis yang lagi terpasang — dicek ORBIT-execute.bat tiap dibuka
 # (server.py --auto-update) untuk tahu perlu unduh ulang atau tidak
 .versi-terpasang
+
+# Identitas laptop & alamat folder ORBIT-Bersama (ingatan koreksi dikte bersama) - milik tiap laptop
+.id-laptop
+.folder-bersama

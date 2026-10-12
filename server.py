@@ -163,6 +163,126 @@ def nama_berkas_aman(s):
     return re.sub(r'\s+', '-', s).lower()[:80] or 'kelas'
 
 
+"""
+INGATAN KOREKSI BERSAMA — pembetulan kata dikte yang dipelajari di satu laptop
+ikut dipakai laptop lain. Tempatnya satu folder OneDrive/SharePoint bernama
+ORBIT-Bersama yang dibagikan ke semua PTP; OneDrive yang menyalinkannya antar
+laptop, server ini cukup membaca/menulis berkas biasa.
+
+Tiap laptop HANYA menulis berkasnya sendiri (koreksi-<id-laptop>.json) dan
+membaca berkas semua laptop lain. Tidak ada dua laptop yang menulis berkas
+yang sama, jadi OneDrive tidak pernah membuat salinan "konflik". Penggabungan
+(suara terbanyak, pembatalan terbaru menang) dikerjakan di aplikasi.
+
+Folder dicari otomatis di OneDrive & folder pengguna. Bila ditaruh di tempat
+lain, alamatnya bisa diisi manual dari Setelan (disimpan di .folder-bersama).
+"""
+NAMA_FOLDER_BERSAMA = 'ORBIT-Bersama'
+BERKAS_FOLDER_BERSAMA = os.path.join(AKAR, '.folder-bersama')   # lokal: tidak ikut zip/git
+BERKAS_ID_LAPTOP = os.path.join(AKAR, '.id-laptop')
+BERSAMA = {'folder': None, 'dicari': 0.0}
+
+
+def id_laptop():
+    try:
+        with open(BERKAS_ID_LAPTOP, encoding='utf-8') as f:
+            i = f.read().strip()
+        if i:
+            return i
+    except OSError:
+        pass
+    import uuid
+    i = nama_berkas_aman(socket.gethostname())[:30] + '-' + uuid.uuid4().hex[:6]
+    try:
+        with open(BERKAS_ID_LAPTOP, 'w', encoding='utf-8') as f:
+            f.write(i)
+    except OSError:
+        pass
+    return i
+
+
+def folder_manual():
+    try:
+        with open(BERKAS_FOLDER_BERSAMA, encoding='utf-8') as f:
+            p = f.read().strip()
+        return p or None
+    except OSError:
+        return None
+
+
+def cari_folder_bersama(paksa=False):
+    """Alamat folder ORBIT-Bersama, atau None. Pencarian dibatasi kedalaman &
+    jumlah folder supaya cepat, dan hasil 'tidak ketemu' diingat 2 menit."""
+    manual = folder_manual()
+    if manual:
+        return manual if os.path.isdir(manual) else None
+    f = BERSAMA['folder']
+    if f and os.path.isdir(f) and not paksa:
+        return f
+    if not paksa and time.time() - BERSAMA['dicari'] < 120:
+        return None
+    BERSAMA['dicari'] = time.time()
+    BERSAMA['folder'] = None
+
+    pangkal = []
+    for kunci in ('OneDriveCommercial', 'OneDrive', 'OneDriveConsumer'):
+        p = os.environ.get(kunci)
+        if p and os.path.isdir(p) and p not in pangkal:
+            pangkal.append(p)
+    profil = os.environ.get('USERPROFILE') or os.path.expanduser('~')
+    if profil and os.path.isdir(profil):
+        pangkal.append(profil)   # pustaka SharePoint tersinkron ada di sini (mis. "Kemenkeu\...")
+
+    target = NAMA_FOLDER_BERSAMA.lower()
+    dikunjungi = 0
+    for akar in pangkal:
+        antrean = [(akar, 0)]
+        while antrean:
+            p, d = antrean.pop(0)
+            try:
+                isi = list(os.scandir(p))
+            except OSError:
+                continue
+            for e in isi:
+                try:
+                    if not e.is_dir() or e.name.startswith(('.', '$')) or e.name in ('AppData', 'node_modules'):
+                        continue
+                except OSError:
+                    continue
+                if e.name.lower() == target:
+                    BERSAMA['folder'] = e.path
+                    return e.path
+                dikunjungi += 1
+                if d < 3 and dikunjungi < 6000:
+                    antrean.append((e.path, d + 1))
+    return None
+
+
+def status_bersama(paksa=False):
+    folder = cari_folder_bersama(paksa)
+    hasil = {'ok': True, 'tersambung': bool(folder), 'folder': folder, 'nama': NAMA_FOLDER_BERSAMA,
+             'manual': folder_manual(), 'laptop': id_laptop(), 'lain': []}
+    if not folder:
+        return hasil
+    sendiri = 'koreksi-%s.json' % id_laptop()
+    try:
+        nama_nama = os.listdir(folder)
+    except OSError:
+        return dict(hasil, tersambung=False)
+    for nama in nama_nama:
+        if not (nama.startswith('koreksi-') and nama.endswith('.json')) or nama == sendiri:
+            continue
+        p = os.path.join(folder, nama)
+        try:
+            with open(p, encoding='utf-8-sig') as f:
+                isi = json.load(f)
+            hasil['lain'].append({'laptop': nama[8:-5], 'ingatan': isi.get('ingatan') or {},
+                                  'waktu': os.path.getmtime(p)})
+        except Exception:
+            continue   # berkas yang sedang disalin OneDrive / rusak dilewati; dicoba lagi nanti
+    return hasil
+
+
 def unduh_dan_pasang_update():
     """Tarik rilis terbaru dari GitHub lalu pasang di tempat. Mengembalikan
     ETag rilis yang baru dipasang (dicatat pemanggil ke TANDA_VERSI), atau
@@ -319,7 +439,7 @@ class Penangan(SimpleHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
         # log ringkas: sembunyikan polling rutin supaya jendela hitam tetap terbaca
-        if any(k in self.path for k in ('/api/liga/status', '/api/liga/bids', '/api/liga/nilai', '/api/info')):
+        if any(k in self.path for k in ('/api/liga/status', '/api/liga/bids', '/api/liga/nilai', '/api/info', '/api/koreksi')):
             return
         sys.stderr.write('  %s  %s\n' % (self.client_address[0], fmt % args))
 
@@ -358,6 +478,11 @@ class Penangan(SimpleHTTPRequestHandler):
             with KUNCI:
                 return self.kirim_json({'buka': NILAI.get('buka', False), 'tanggal': NILAI.get('tanggal'),
                                         'masuk': NILAI.get('masuk', [])})
+
+        if jalur == '/api/koreksi':
+            if not self.dari_laptop():
+                return self.kirim_json({'ok': False, 'pesan': 'Tidak diizinkan.'}, 403)
+            return self.kirim_json(status_bersama(paksa='cari=1' in self.path))
 
         if jalur == '/api/liga/bids':
             if not self.dari_laptop():
@@ -462,6 +587,38 @@ class Penangan(SimpleHTTPRequestHandler):
             self.kirim_json({'ok': True, 'pesan': 'Update terpasang. Menyalakan ulang server...'})
             threading.Thread(target=mulai_ulang_server, daemon=True).start()
             return
+
+        if jalur == '/api/koreksi':
+            folder = cari_folder_bersama()
+            if not folder:
+                return self.kirim_json({'ok': True, 'tersambung': False})
+            ingatan = data.get('ingatan')
+            if not isinstance(ingatan, dict):
+                return self.kirim_json({'ok': False, 'pesan': 'Data tidak terbaca.'}, 400)
+            tujuan = os.path.join(folder, 'koreksi-%s.json' % id_laptop())
+            sementara = tujuan + '.tmp'
+            try:
+                with open(sementara, 'w', encoding='utf-8') as f:
+                    json.dump({'laptop': id_laptop(), 'waktu': time.strftime('%Y-%m-%dT%H:%M:%S'),
+                               'ingatan': ingatan}, f, ensure_ascii=False)
+                os.replace(sementara, tujuan)
+            except OSError as e:
+                return self.kirim_json({'ok': False, 'tersambung': True, 'pesan': str(e)})
+            return self.kirim_json({'ok': True, 'tersambung': True})
+
+        if jalur == '/api/koreksi/folder':
+            p = str(data.get('folder') or '').strip().strip('"')
+            if p and not os.path.isdir(p):
+                return self.kirim_json({'ok': False, 'pesan': 'Folder itu tidak ditemukan di laptop ini.'})
+            try:
+                if p:
+                    with open(BERKAS_FOLDER_BERSAMA, 'w', encoding='utf-8') as f:
+                        f.write(p)
+                elif os.path.exists(BERKAS_FOLDER_BERSAMA):
+                    os.remove(BERKAS_FOLDER_BERSAMA)
+            except OSError as e:
+                return self.kirim_json({'ok': False, 'pesan': str(e)})
+            return self.kirim_json(status_bersama(paksa=True))
 
         if jalur == '/api/liga/arsip':
             kelas = (data.get('kelas') or {})

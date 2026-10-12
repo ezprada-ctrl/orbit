@@ -245,8 +245,35 @@ Di bawah kolom akan muncul baris kecil:
   Aplikasi mengingatnya, jadi lain kali kesalahan yang sama dibetulkan sendiri.
 
 Yang **tidak pernah** diubah: angka, kata pendek, singkatan berhuruf besar, dan
-nama diri (berhuruf besar di tengah kalimat). Ingatan pembetulan tersimpan di
-browser laptop ini — makin sering dipakai, makin tepat.
+nama diri (berhuruf besar di tengah kalimat). Makin sering dipakai, makin tepat.
+
+### Ingatan pembetulan dibagi ke semua laptop
+
+Pembetulan yang dipelajari di satu laptop bisa ikut dipakai di laptop PTP lain,
+lewat satu folder OneDrive bersama bernama **`ORBIT-Bersama`**.
+
+**Disiapkan sekali oleh koordinator:**
+1. Buat folder bernama persis **`ORBIT-Bersama`** di OneDrive Kemenkeu
+2. Bagikan folder itu ke semua PTP dengan izin **dapat mengedit**
+
+**Dilakukan sekali oleh tiap PTP:**
+1. Buka tautan bagikan folder itu, klik **Tambahkan pintasan ke File Saya**
+2. Pastikan OneDrive di laptop menyala (ikon awan di pojok kanan bawah)
+3. Buka ORBIT lewat `ORBIT-execute.bat` → ikon roda gigi (Setelan) → bagian
+   **Ingatan Koreksi Dikte · Bersama** → klik **Cari lagi**
+
+Kalau sudah muncul **✓ Tersambung**, selesai. Sejak itu:
+- Setiap pembetulan, pembatalan (↶), dan tanda "kata ini sudah benar" (×) di
+  laptop mana pun ikut menyebar ke laptop lain.
+- Laptop lain menerimanya dalam hitungan menit (menunggu OneDrive menyalin).
+- Kalau dua laptop berbeda pendapat, suara terbanyak yang dipakai. Pembatalan
+  yang lebih baru mengalahkan pembetulan yang lebih lama, jadi satu suntingan
+  keliru tidak menyebar selamanya.
+- Tanpa internet atau tanpa folder bersama, ORBIT tetap jalan memakai ingatan
+  laptop itu sendiri, lalu membagikannya begitu tersambung lagi.
+
+Kalau foldernya ditaruh di tempat lain dan tidak ketemu otomatis, buka
+**Folder ada di tempat lain?** di Setelan dan tempel alamat foldernya.
 
 ### Nama daerah terisi sendiri
 

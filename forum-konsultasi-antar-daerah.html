@@ -874,6 +874,13 @@ body.mode-standar #panel{display:none!important}
 .std-hasil .sesi{font-size:12.5px;color:var(--text-dim);font-weight:700;margin-bottom:2px}
 .std-hasil mark,.std-tabel mark{background:var(--accent-soft);color:inherit;border-radius:3px}
 .set-opsi{display:grid;gap:12px;margin-top:14px}
+.set-bersama{margin-top:10px;font-size:14px;line-height:1.55}
+.set-bersama p{margin:0 0 8px}
+.set-bersama .ok{color:var(--text)}
+.set-bersama .kecil{font-size:13px;color:var(--text-dim);word-break:break-all}
+.set-bersama summary{cursor:pointer;margin-top:4px}
+.set-aksi{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.set-aksi .field{flex:1;min-width:200px;width:auto}
 .set-opsi button{text-align:left;padding:18px 20px;border-radius:var(--radius-sm);
   border:1.5px solid var(--line);background:var(--surface);color:var(--text);font:inherit;cursor:pointer}
 .set-opsi button b{display:block;font-size:16.5px;margin-bottom:4px}
@@ -1645,10 +1652,12 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
       </div>
 
       <details class="std-card" style="margin-top:18px">
-        <summary style="cursor:pointer;font-weight:700">Masukkan transkrip dari luar (chat WhatsApp/Zoom, transkrip Teams/Zoom .vtt, atau teks)</summary>
+        <summary style="cursor:pointer;font-weight:700">Masukkan transkrip dari luar (chat WhatsApp/Zoom, transkrip Teams/Zoom, atau teks)</summary>
         <p class="sub" style="margin-top:12px">Satu baris per ucapan dengan format <b>Nama: isi</b> atau <b>Nama (Unit Kerja): isi</b>.
           Cap waktu WhatsApp/Zoom dan berkas <code>.vtt</code> dikenali otomatis. Pembicara yang belum terdaftar
           ditambahkan ke daftar peserta. Ucapan beruntun dari orang yang sama digabung.</p>
+        <p class="sub" style="margin-top:-4px"><b>Dari Teams:</b> buka rekaman rapat → Transkrip → Unduh <code>.vtt</code>, lalu pilih berkasnya di bawah.
+          Bisa juga menyalin langsung dari panel transkrip lalu menempelnya di kotak ini.</p>
         <textarea class="field" id="stdTempel" rows="6" placeholder="Budi Santoso: Menurut saya jadwalnya perlu dimajukan.&#10;Rina (Bagian Umum): Setuju, ruangannya tersedia hari Senin."></textarea>
         <div class="std-bar" style="margin:12px 0 0">
           <button class="btn btn-ghost" onclick="$id('stdBerkasTranskrip').click()">Pilih berkas .txt / .vtt</button>
@@ -2794,8 +2803,86 @@ function muatKK(){
     if(r && typeof r === 'object') KK = Object.assign({ganti:{}, konteks:{}, kenal:{}, tolak:{}}, r);
   }catch(e){}
 }
-function simpanKK(){ try{ localStorage.setItem(KK_KEY, JSON.stringify(KK)); }catch(e){} kkCache = null; }
-muatKK();
+function simpanKK(){
+  try{ localStorage.setItem(KK_KEY, JSON.stringify(KK)); }catch(e){}
+  hitungKKe();
+  kirimKKBersama();
+}
+
+/* ------------------------------------------------------------------
+   INGATAN BERSAMA ANTAR-LAPTOP
+   KK = ingatan laptop ini (hanya ini yang ditulis & dikirim).
+   KK_LAIN = ingatan laptop lain, dibaca dari folder ORBIT-Bersama lewat
+   server lokal. KKe = gabungan keduanya — inilah yang dipakai membetulkan.
+   Aturan gabung:
+     - satu kata salah punya beberapa usulan pengganti -> suara terbanyak
+     - pembatalan (↶) mengalahkan pelajaran yang LEBIH LAMA darinya, dan
+       pelajaran baru mengalahkan pembatalan yang lebih lama — jadi satu
+       suntingan keliru tidak menyebar selamanya, tapi juga bisa dipulihkan
+     - "kata ini sudah benar" berlaku di semua laptop
+   Tanpa server (dibuka dari file://) atau tanpa folder bersama, ORBIT
+   tetap jalan dengan ingatan laptop ini saja.
+   ------------------------------------------------------------------ */
+let KK_LAIN = [], KKe = KK;
+let kkBersama = {tersambung: false, cek: false};
+
+function gabungKK(daftar){
+  const ef = {ganti:{}, konteks:{}, kenal:{}, tolak:{}};
+  const suara = {ganti:{}, konteks:{}};
+  daftar.forEach(k => {
+    if(!k) return;
+    ['ganti', 'konteks'].forEach(j => Object.entries(k[j] || {}).forEach(([a, g]) => {
+      if(!g || !g.ke) return;
+      const s = suara[j][a] = suara[j][a] || {};
+      const x = s[g.ke] = s[g.ke] || {ke: g.ke, n: 0, t: 0};
+      x.n += g.n || 1;
+      x.t = Math.max(x.t, g.t || 0);
+    }));
+    Object.entries(k.kenal || {}).forEach(([w, t]) => { ef.kenal[w] = Math.max(ef.kenal[w] || 0, +t || 1); });
+    Object.entries(k.tolak || {}).forEach(([p, t]) => { ef.tolak[p] = Math.max(ef.tolak[p] || 0, +t || 1); });
+  });
+  ['ganti', 'konteks'].forEach(j => Object.entries(suara[j]).forEach(([a, s]) => {
+    const kata = j === 'ganti' ? a : a.split(' ').pop();
+    const hidup = Object.values(s).filter(x => {
+      const p = kata + '>' + x.ke.toLowerCase();
+      if(!ef.tolak[p]) return true;
+      if(x.t > ef.tolak[p]){ delete ef.tolak[p]; return true; }   // dipelajari ulang setelah dibatalkan
+      return false;
+    });
+    if(hidup.length) ef[j][a] = hidup.sort((p, q) => q.n - p.n || q.t - p.t)[0];
+  }));
+  return ef;
+}
+function hitungKKe(){ KKe = gabungKK([KK].concat(KK_LAIN)); kkCache = null; }
+
+/* Ke server lokal saja (localhost). Server yang menulis ke folder OneDrive. */
+let tundaKirimKK = null;
+function kirimKKBersama(){
+  if(location.protocol === 'file:' || !kkBersama.tersambung) return;
+  clearTimeout(tundaKirimKK);
+  tundaKirimKK = setTimeout(() => {
+    fetch('/api/koreksi', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ingatan: KK})}).catch(() => {});
+  }, 1500);
+}
+async function sinkronKKBersama(cari){
+  if(location.protocol === 'file:') return kkBersama;
+  try{
+    const r = await fetch('/api/koreksi' + (cari ? '?cari=1' : ''), {cache: 'no-store'});
+    if(!r.ok) throw 0;
+    const d = await r.json();
+    const baruTersambung = d.tersambung && !kkBersama.tersambung;
+    kkBersama = Object.assign(d, {cek: true});
+    KK_LAIN = (d.lain || []).map(x => x.ingatan);
+    hitungKKe();
+    // pertama tersambung: ingatan laptop ini langsung ikut dibagikan
+    if(baruTersambung && (Object.keys(KK.ganti).length || Object.keys(KK.konteks).length
+       || Object.keys(KK.kenal).length || Object.keys(KK.tolak).length)) kirimKKBersama();
+  }catch(e){
+    kkBersama = {tersambung: false, cek: true, tanpaServer: true};
+  }
+  return kkBersama;
+}
 
 const HURUF = 'A-Za-zÀ-ÖØ-öø-ÿ';
 const RE_KATA = new RegExp('[' + HURUF + ']+(?:-[' + HURUF + ']+)*', 'g');
@@ -2836,6 +2923,10 @@ function bentukDasar(w){
    yang tersimpan (frekuensi kata & pasangan kata berurutan). Disimpan
    sebentar supaya tidak dibangun ulang di tiap potongan kalimat. */
 let kkCache = null, kkWaktu = 0;
+muatKK();
+hitungKKe();
+sinkronKKBersama();
+setInterval(() => { if(!document.hidden) sinkronKKBersama(); }, 60000);   // ambil pelajaran laptop lain
 function bunyi(w){
   return w.replace(/kh/g,'k').replace(/sy/g,'s').replace(/dz/g,'z').replace(/ph/g,'f')
           .replace(/v/g,'f').replace(/q/g,'k').replace(/x/g,'ks').replace(/oe/g,'u')
@@ -2854,7 +2945,7 @@ function kosakata(){
   KAMUS_ISTILAH.forEach(([b]) => kataKata(b).forEach(w => domain.add(w)));
   ISTILAH_ARAH.concat(FRASA_DOMAIN).forEach(f => { kataKata(f).forEach(w => domain.add(w)); tambahTeks(f); });
   WILAYAH.forEach(w => kataKata(w.c).forEach(x => domain.add(x)));
-  Object.values(KK.ganti).concat(Object.values(KK.konteks))
+  Object.values(KKe.ganti).concat(Object.values(KKe.konteks))
     .forEach(g => kataKata(g.ke).forEach(x => domain.add(x)));
   const kumpul = (o, d) => {
     if(o == null || d > 8) return;
@@ -2881,7 +2972,7 @@ function kosakata(){
 
 function kataDikenal(w, v){
   if(w.length <= 3 || /\d/.test(w)) return true;
-  if(KK.kenal[w]) return true;
+  if(KKe.kenal[w]) return true;
   if(w.includes('-')) return w.split('-').every(x => kataDikenal(x, v));
   if(v.domain.has(w) || (v.frek.get(w) || 0) >= 3) return true;
   return bentukDasar(w).some(x => LEKSIKON.has(x) || v.domain.has(x));
@@ -2981,12 +3072,12 @@ function koreksiKonteks(teks, sebelum, conf){
     const asli = tk.s, w = asli.toLowerCase();
     const next = token[j+1] ? token[j+1].s.toLowerCase() : '';
     let ke = null, cal = null;
-    const kt = KK.konteks[prev + ' ' + w], gl = KK.ganti[w];
-    if(kt && !KK.tolak[w + '>' + kt.ke.toLowerCase()]) ke = kt.ke;          // pelajaran PTP, dengan konteks
-    else if(gl && !KK.tolak[w + '>' + gl.ke.toLowerCase()]) ke = gl.ke;     // pelajaran PTP, umum
+    const kt = KKe.konteks[prev + ' ' + w], gl = KKe.ganti[w];
+    if(kt && !KKe.tolak[w + '>' + kt.ke.toLowerCase()]) ke = kt.ke;          // pelajaran PTP, dengan konteks
+    else if(gl && !KKe.tolak[w + '>' + gl.ke.toLowerCase()]) ke = gl.ke;     // pelajaran PTP, umum
     else if(bolehDiperiksa(asli, tk.i, teks) && !kataDikenal(w, v)){
       const daftar = [...calonPengganti(w, v)]
-        .filter(([c]) => !KK.tolak[w + '>' + c])
+        .filter(([c]) => !KKe.tolak[w + '>' + c])
         .map(([c, d]) => ({c, n: nilaiCalon(c, d, prev, next, conf, v)}))
         .sort((a, b) => b.n - a.n);
       if(daftar.length){
@@ -3070,9 +3161,9 @@ function belajarDariSuntingan(lama, baru){
     // kata aslinya sah ("pajang"), jadi hanya dibetulkan bila didahului kata yang sama
     if(!prev) return null;
     const k = prev + ' ' + a;
-    KK.konteks[k] = {ke: b, n: ((KK.konteks[k] || {}).n || 0) + 1};
+    KK.konteks[k] = {ke: b, n: ((KK.konteks[k] || {}).n || 0) + 1, t: Date.now()};
   }else{
-    KK.ganti[a] = {ke: b, n: ((KK.ganti[a] || {}).n || 0) + 1};
+    KK.ganti[a] = {ke: b, n: ((KK.ganti[a] || {}).n || 0) + 1, t: Date.now()};
   }
   delete KK.tolak[a + '>' + bl];
   simpanKK();
@@ -3184,8 +3275,8 @@ function pasangDikte(inputId, btnId, opsi){
   }
   function tolakKoreksi(c){
     const a = c.dari.toLowerCase(), b = c.ke.toLowerCase();
-    KK.tolak[a + '>' + b] = 1;
-    KK.kenal[a] = 1;
+    KK.tolak[a + '>' + b] = Date.now();
+    KK.kenal[a] = Date.now();
     if(KK.ganti[a] && KK.ganti[a].ke.toLowerCase() === b) delete KK.ganti[a];
     Object.keys(KK.konteks).forEach(k => { if(k.endsWith(' ' + a) && KK.konteks[k].ke.toLowerCase() === b) delete KK.konteks[k]; });
     simpanKK();
@@ -3216,13 +3307,13 @@ function pasangDikte(inputId, btnId, opsi){
       if(gantiDiKolom(field, c.ke, c.dari, c.i)){ kabariBerubah(); tolakKoreksi(c); }
     }else if(c.jenis === 'saran'){
       if(t.dataset.x){
-        KK.kenal[c.kata.toLowerCase()] = 1;
+        KK.kenal[c.kata.toLowerCase()] = Date.now();
         simpanKK();
       }else{
         const pilih = c.calon[+t.dataset.c];
         if(gantiDiKolom(field, c.kata, pilih, c.i)){
           kabariBerubah();
-          KK.ganti[c.kata.toLowerCase()] = {ke: pilih, n: 1};
+          KK.ganti[c.kata.toLowerCase()] = {ke: pilih, n: 1, t: Date.now()};
           delete KK.tolak[c.kata.toLowerCase() + '>' + pilih.toLowerCase()];
           simpanKK();
         }
@@ -6266,8 +6357,64 @@ function bukaSetelan(){
     <p style="color:var(--text-dim);font-size:13.5px;line-height:1.55;margin-top:14px">
       Data kedua mode tersimpan terpisah. Beralih mode tidak menghapus apa pun: data forum &amp; Liga
       dibekukan dan bisa dilanjutkan saat kembali.</p>
+    <div class="rk-lbl">Ingatan Koreksi Dikte · Bersama</div>
+    <div id="setBersama" class="set-bersama">Memeriksa…</div>
     <div style="display:flex;margin-top:18px"><button class="btn btn-ghost" style="margin-left:auto" onclick="tutupModal()">Tutup</button></div>`;
   $id('overlay').classList.add('on');
+  sinkronKKBersama().then(tampilSetBersama);
+}
+
+/* Status berbagi ingatan koreksi, dalam bahasa PTP: tersambung atau belum,
+   berapa laptop lain yang ikut, dan apa yang harus dilakukan bila belum. */
+function tampilSetBersama(){
+  const el = $id('setBersama');
+  if(!el) return;
+  const b = kkBersama;
+  const jumlahIngat = Object.keys(KKe.ganti).length + Object.keys(KKe.konteks).length;
+  if(location.protocol === 'file:' || b.tanpaServer){
+    el.innerHTML = `<p>Berbagi ingatan hanya jalan bila ORBIT dibuka lewat <b>ORBIT-execute.bat</b>.
+      Saat ini ingatan hanya tersimpan di laptop ini (${jumlahIngat} pembetulan).</p>`;
+    return;
+  }
+  if(b.tersambung){
+    const n = (b.lain || []).length;
+    el.innerHTML = `<p class="ok">✓ Tersambung ke folder <b>${esc(b.nama)}</b>.
+      ${n ? `Ikut belajar dari <b>${n}</b> laptop lain.` : 'Belum ada laptop lain yang ikut — begitu ada, pelajarannya otomatis bergabung.'}
+      Total <b>${jumlahIngat}</b> pembetulan yang diingat.</p>
+      <p class="kecil">${esc(b.folder)}</p>
+      <div class="set-aksi">
+        ${b.manual ? `<button class="btn btn-ghost" onclick="aturFolderBersama('')">Kembali ke pencarian otomatis</button>` : ''}
+        <button class="btn btn-ghost" onclick="sinkronKKBersama(true).then(tampilSetBersama)">Segarkan</button>
+      </div>`;
+    return;
+  }
+  el.innerHTML = `<p>Belum tersambung — pembetulan hanya diingat di laptop ini (${jumlahIngat} pembetulan).</p>
+    <p class="kecil">Supaya semua laptop saling berbagi: koordinator membuat folder bernama
+      <b>${esc(b.nama || 'ORBIT-Bersama')}</b> di OneDrive dan membagikannya ke semua PTP. Tiap PTP membuka tautan
+      bagikan itu, klik <b>Tambahkan pintasan ke File Saya</b>, lalu klik <b>Cari lagi</b> di bawah.</p>
+    <div class="set-aksi">
+      <button class="btn btn-ghost" onclick="cariLagiBersama(this)">Cari lagi</button>
+    </div>
+    <details class="kecil"><summary>Folder ada di tempat lain?</summary>
+      <div class="set-aksi"><input id="setFolderBersama" class="field" placeholder="Tempel alamat folder, mis. C:\\Users\\...\\ORBIT-Bersama">
+      <button class="btn btn-ghost" onclick="aturFolderBersama($id('setFolderBersama').value)">Pakai</button></div>
+    </details>`;
+}
+async function cariLagiBersama(btn){
+  btn.disabled = true; btn.textContent = 'Mencari…';
+  await sinkronKKBersama(true);
+  tampilSetBersama();
+  toast(kkBersama.tersambung ? 'Folder bersama ditemukan.' : 'Folder ORBIT-Bersama belum ditemukan di laptop ini.');
+}
+async function aturFolderBersama(folder){
+  try{
+    const r = await fetch('/api/koreksi/folder', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({folder})});
+    const d = await r.json();
+    if(d.ok === false){ toast(d.pesan || 'Folder tidak bisa dipakai.'); return; }
+  }catch(e){ toast('Server ORBIT tidak menjawab.'); return; }
+  await sinkronKKBersama(true);
+  tampilSetBersama();
 }
 
 function gantiModeApp(m){
@@ -6620,21 +6767,43 @@ function stdHapusPeserta(pid){
 /* Mengenali: WebVTT (Teams/Zoom), "<v Nama>isi", chat WhatsApp
    ("[25/09/26 10.15.02] Nama: isi" / "25/09/26 10.15 - Nama: isi"),
    chat Zoom ("10:15:02 From Nama to Everyone: isi"), dan "Nama: isi".
-   Baris tanpa nama dianggap lanjutan ucapan sebelumnya. */
+   Baris tanpa nama dianggap lanjutan ucapan sebelumnya.
+   Transkrip Teams ikut dikenali: berkas .vtt (termasuk baris kode penanda yang
+   disisipkan Teams), dan salinan dari panel transkrip / berkas Word-nya yang
+   berbentuk "Nama  0:05" lalu isi ucapan di baris berikutnya. Label "(Guest)" /
+   "(Unverified)" di nama akun dibuang, supaya tidak terbaca sebagai unit kerja. */
+const RE_KODE_CUE = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}(\/\d+(-\d+)*)?$/i;
+const RE_KEPALA_TEAMS = /^([^\d:]{2,70}?)\s+(\d{1,2}:\d{1,2}(:\d{1,2})?)$/;
+const RE_LABEL_AKUN = /\s*[\(\[]\s*(guest|tamu|unverified|external|eksternal|tidak terverifikasi|belum terverifikasi)\s*[\)\]]/gi;
 function uraiTranskrip(t){
   const hasil = [];
   const dorong = (nama, isi) => {
-    nama = rapi(nama || ''); isi = rapi(isi || '');
+    nama = rapi((nama || '').replace(RE_LABEL_AKUN, '')); isi = rapi(isi || '');
     if(!isi) return;
     const akhir = hasil[hasil.length-1];
     if(akhir && normal(akhir.nama) === normal(nama)) akhir.isi += ' ' + isi;
     else hasil.push({nama, isi});
   };
-  t.replace(/^﻿/, '').split(/\r?\n/).forEach(b=>{
+  const semuaBaris = t.replace(/^﻿/, '').split(/\r?\n/);
+  const tak = semuaBaris.map(b => b.trim()).filter(Boolean);
+  // gaya Teams (nama + jam, isi di baris berikutnya): baru dipakai bila memang dominan, supaya
+  // kalimat biasa yang kebetulan berakhir dengan jam ("rapat mulai 10:30") tidak dikira pembicara
+  const gayaTeams = tak.filter(b => RE_KEPALA_TEAMS.test(b)).length >= 2
+    && tak.filter(b => RE_KEPALA_TEAMS.test(b)).length >= tak.length * 0.2;
+  // di berkas VTT, baris tanpa <v Nama> selalu lanjutan ucapan — "Catatan: ..." bukan pembicara baru
+  const gayaVtt = /^WEBVTT/m.test(t) || /<v\s+[^>]+>/i.test(t);
+  let pembicara = null;
+  semuaBaris.forEach(b=>{
     b = b.trim();
-    if(!b || /^WEBVTT/i.test(b) || /-->/.test(b) || /^\d+$/.test(b) || /^(NOTE|STYLE)\b/.test(b)) return;
+    if(!b || /^WEBVTT/i.test(b) || /-->/.test(b) || /^\d+$/.test(b) || /^(NOTE|STYLE)\b/.test(b) || RE_KODE_CUE.test(b)) return;
     let m = b.match(/^<v\s+([^>]+)>(.*?)(<\/v>)?$/i);
-    if(m){ dorong(m[1], m[2].replace(/<[^>]+>/g,'')); return; }
+    if(m){ pembicara = m[1]; dorong(m[1], m[2].replace(/<[^>]+>/g,'')); return; }
+    if(gayaVtt){ dorong(pembicara, b.replace(/<[^>]+>/g,'')); return; }
+    if(gayaTeams){
+      m = b.match(RE_KEPALA_TEAMS);
+      if(m){ pembicara = m[1]; return; }
+      if(pembicara !== null){ dorong(pembicara, b); return; }
+    }
     b = b.replace(/^\[?\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4},?\s+\d{1,2}[.:]\d{2}([.:]\d{2})?(\s?[AP]M)?\]?\s*-?\s*/i, '')
          .replace(/^\[?\d{1,2}[.:]\d{2}([.:]\d{2})?\]?\s*-?\s*/, '')
          .replace(/^From\s+(.+?)\s+to\s+[^:]+:/i, '$1:');
