@@ -349,6 +349,7 @@ class Penangan(SimpleHTTPRequestHandler):
                 return self.kirim_json({
                     'buka': True, 'masalahId': j['masalahId'], 'judul': j['judul'],
                     'daerah': j['daerah'], 'peserta': j['peserta'], 'nilai': nilai,
+                    'pemilikNama': j.get('pemilikNama', ''),
                 })
 
         if jalur == '/api/liga/nilai':
@@ -406,6 +407,7 @@ class Penangan(SimpleHTTPRequestHandler):
                     'judul': str(data.get('judul') or '')[:300],
                     'daerah': str(data.get('daerah') or '')[:200],
                     'pemilik': str(data.get('pemilik') or ''),
+                    'pemilikNama': str(data.get('pemilikNama') or '')[:200],
                     'peserta': [{'id': str(p.get('id')), 'nama': str(p.get('nama')),
                                  'daerah': str(p.get('daerah') or '')}
                                 for p in (data.get('peserta') or [])],

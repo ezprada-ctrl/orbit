@@ -172,7 +172,7 @@ function gambar(){
   const kp = document.getElementById('kp');
   if(draf.kpMid === status.masalahId) kp.value = draf.kp;
   kp.addEventListener('input', ()=>{ draf.kp = kp.value; draf.kpMid = status.masalahId; });
-  pasangCari(status.peserta, 'kp');
+  pasangCari(status.peserta, 'kp', status.pemilikNama);
 }
 
 function gambarNilai(el){
@@ -249,7 +249,7 @@ function tandaiCocok(t, q){
   if(!q || i < 0) return esc(t);
   return esc(t.slice(0,i)) + '<mark>' + esc(t.slice(i,i+q.length)) + '</mark>' + esc(t.slice(i+q.length));
 }
-function pasangCari(daftar, fokusId){
+function pasangCari(daftar, fokusId, pemilik){
   const inp = document.getElementById('nama'), box = document.getElementById('saran');
   let hasil = [], aktif = -1;
   const pilih = p => { inp.dataset.id = p.id; draf.nama = p.id; inp.value = p.nama + ' — ' + p.daerah; box.hidden = true; const f = document.getElementById(fokusId); if(f && f.type !== 'range') f.focus(); };
@@ -265,7 +265,9 @@ function pasangCari(daftar, fokusId){
       .sort((a,b)=>a[0]-b[0]||a[1].nama.localeCompare(b[1].nama,'id')).map(x=>x[1]);
     aktif = hasil.length ? 0 : -1;
     box.innerHTML = hasil.length ? hasil.map((p,i)=>`<div class="opsi${i===aktif?' act':''}" data-i="${i}"><b>${tandaiCocok(p.nama,q)}</b><span>${tandaiCocok(p.daerah,q)}</span></div>`).join('')
-      : '<div class="kosong">Nama tidak ditemukan. Coba ketik nama daerah Anda.</div>';
+      : '<div class="kosong">' + (pemilik && norm(pemilik).includes(q)
+          ? esc(pemilik) + ' adalah pemilik masalah ini — tidak bisa bid di masalahnya sendiri.'
+          : 'Nama tidak ditemukan. Coba ketik nama daerah Anda.') + '</div>';
     box.hidden = false;
   }
   inp.addEventListener('input', ()=>{ inp.dataset.id = ''; tampil(); });
