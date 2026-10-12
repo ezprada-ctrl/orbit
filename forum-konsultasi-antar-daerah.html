@@ -758,6 +758,14 @@ select.field{padding:13px 14px;font-size:15px;font-weight:600}
 .lg-kolom.info{background:var(--surface-2);border-left-color:var(--line);color:var(--text-dim);margin-bottom:0}
 .lg-kolom .btn{padding:8px 14px;font-size:13.5px}
 .lg-kolom .btn:first-of-type{margin-left:auto}
+/* tombol "Selesai giliran": berdenyut supaya jelas bisa diklik */
+.lg-kolom .btn-selesai{background:var(--liga);color:#fff;border:0;font-weight:600;gap:6px;
+  animation:selesaiDenyut 1.8s ease-in-out infinite;transition:transform .15s,filter .15s}
+.lg-kolom .btn-selesai:hover{transform:translateY(-1px) scale(1.04);filter:brightness(1.08);animation-play-state:paused}
+.lg-kolom .btn-selesai:active{transform:scale(.97)}
+@keyframes selesaiDenyut{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--liga) 55%,transparent)}
+  60%{box-shadow:0 0 0 9px color-mix(in srgb,var(--liga) 0%,transparent)}}
+@media (prefers-reduced-motion:reduce){.lg-kolom .btn-selesai{animation:none}}
 #tgDaerah[readonly]{opacity:.85;cursor:not-allowed}
 .lg-hasil b{color:var(--liga)}
 
@@ -4942,7 +4950,7 @@ function aturKolomTanggapan(){
   const pe = b ? pesertaById(b.pesertaId) : null;
   if(b && pe){
     bar.innerHTML = `<div class="lg-kolom">Mencatat jawaban: <b>${esc(pe.nama)}</b> — ${esc(pe.daerah)}
-      <button class="btn btn-ghost" onclick="giliranBid('${b.id}')">Selesai giliran</button></div>`;
+      <button class="btn btn-selesai" title="Klik untuk menyudahi giliran bicara penanggap ini" onclick="giliranBid('${b.id}')">✓ Selesai giliran</button></div>`;
     d.value = pe.daerah; kunci(true); tampilkan(true);
     return;
   }
