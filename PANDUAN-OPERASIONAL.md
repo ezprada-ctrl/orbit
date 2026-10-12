@@ -225,6 +225,29 @@ Yang sudah dikenali: `BPHTB` `PBB-P2` `PBJT` `SPTPD` `SPPT` `NJOP` `opsen`
 Kalau ada istilah lain yang sering salah di kelas Anda, catat bentuk salahnya
 dan minta ditambahkan — daftarnya ada di bagian `KAMUS_ISTILAH` dalam file HTML.
 
+### Kata janggal dibetulkan otomatis — dan aplikasi ikut belajar
+
+Selain daftar istilah di atas, aplikasi memeriksa setiap kata yang masuk dari
+dikte. Kata yang **asing** (tidak dikenal sebagai kata Bahasa Indonesia, istilah
+pajak daerah, nama daerah, atau kata yang sering muncul di catatan lama) dicari
+penggantinya yang **ejaannya hampir sama** dan **cocok dengan kata sebelum dan
+sesudahnya**. Contoh: *"tunggakan pajk kendaraan"* → *"tunggakan pajak
+kendaraan"*.
+
+Di bawah kolom akan muncul baris kecil:
+
+- **`pajk → pajak ↶`** — sudah dibetulkan otomatis. Kalau ternyata salah,
+  **klik** untuk mengembalikan kata aslinya. Aplikasi tidak akan mengulanginya.
+- **`sisten? sistem ×`** (bergaris putus-putus) — aplikasi ragu, jadi teks
+  **tidak diubah**. Klik `sistem` untuk memakai saran, atau `×` kalau kata itu
+  memang benar (tidak akan ditandai lagi).
+- **`Diingat: … → …`** — Anda baru saja membetulkan satu kata dengan tangan.
+  Aplikasi mengingatnya, jadi lain kali kesalahan yang sama dibetulkan sendiri.
+
+Yang **tidak pernah** diubah: angka, kata pendek, singkatan berhuruf besar, dan
+nama diri (berhuruf besar di tengah kalimat). Ingatan pembetulan tersimpan di
+browser laptop ini — makin sering dipakai, makin tepat.
+
 ### Nama daerah terisi sendiri
 
 Kalau penanggap **menyebut daerahnya lebih dulu** — *"Kabupaten Sleman. Di
@@ -310,7 +333,8 @@ Kendali otomatis kembali ke PTP. Siap untuk masalah berikutnya.
 | Internet mati | Dikte mati, **PDF tidak bisa diunduh** | Catat dengan mengetik biasa. Unduh PDF setelah internet nyala |
 | Mic tidak tertangkap | Tombol Dikte tidak jalan | Pakai ketik biasa. Jangan buang waktu membetulkan di depan kelas |
 | Tombol Dikte tidak muncul | Browser tidak mendukung | Pakai Chrome atau Edge |
-| Dikte banyak salah | Wajar, terutama singkatan | Betulkan manual. Tetap lebih cepat daripada mengetik dari nol |
+| Dikte banyak salah | Wajar, terutama singkatan | Betulkan manual — aplikasi mengingat pembetulan Anda dan menerapkannya sendiri lain kali |
+| Ada kata benar yang ikut diganti otomatis | Kata itu belum dikenal aplikasi | Klik tanda `↶` di bawah kolom. Kata kembali, dan tidak akan diganti lagi |
 | Dikte berhenti sendiri | Chrome rutin memutus sesi | **Tidak perlu apa-apa** — aplikasi menyambung sendiri dalam sekejap |
 | Muncul "Dikte terputus" di bawah kolom | Gagal menyambung 5× beruntun, biasanya internet | Klik tombol **Dikte** lagi. Teks yang sudah masuk tetap aman |
 | Peserta bicara bersamaan | Hasil dikte kacau | WI menegur: satu-satu |
