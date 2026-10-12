@@ -186,6 +186,10 @@ input,textarea,select{font-family:inherit;color:inherit}
 .btn-kirim{background:#34C759;color:#fff;border-color:transparent;box-shadow:0 1px 2px rgba(0,0,0,.16);gap:8px}.btn-kirim:hover{background:#2DB04F}.btn-kirim .kirim-ik{font-size:1.15em;line-height:1;font-weight:700}
 .kirim-ok{color:#248A3D;font-weight:600;opacity:0;transition:opacity .25s}.kirim-ok.on{opacity:1}
 .btn-wi{background:var(--accent-2);color:var(--on-accent-2);border-color:transparent;box-shadow:0 1px 2px rgba(0,0,0,.16)}
+/* versi "tenang" dari tombol berwarna — warna tetap menandai fungsinya (biru = mulai/lanjut, hijau = tuntas) saat bukan langkah utama */
+.btn-soft-accent{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.btn-soft-wi{background:var(--accent-2-soft);color:var(--accent-2);border-color:var(--accent-2)}
+.btn-soft-accent:hover,.btn-soft-wi:hover{filter:none;background:transparent}
 .btn-lg{padding:18px 34px;font-size:19px;border-radius:980px}
 .btn-ghost{background:transparent}
 .btn-ghost:hover{background:var(--surface-2)}
@@ -659,6 +663,24 @@ select.field{padding:13px 14px;font-size:15px;font-weight:600}
   color:var(--text-dim);font-style:italic;padding-left:12px;
   border-left:2px solid var(--accent-2)}
 .dikte-kap.on{display:block}
+/* Baris koreksi otomatis di bawah kolom dikte. Kolom isian polos tidak bisa
+   menggarisbawahi kata, jadi jejak pembetulan ditaruh di sini. */
+.kk-bar{display:none;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:13px;line-height:1.4}
+.kk-bar.on{display:flex}
+.kk-c{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
+  background:var(--surface-2);border:1px solid var(--line);color:var(--text-dim);font:inherit}
+.kk-c s{opacity:.7}
+.kk-c b{color:var(--text);font-weight:600}
+button.kk-ganti{cursor:pointer}
+button.kk-ganti:hover{border-color:var(--accent-2);color:var(--text)}
+.kk-u{font-size:12px;opacity:.75}
+.kk-saran{border-style:dashed;border-color:var(--warn);padding-right:4px}
+.kk-q{color:var(--warn);font-weight:600}
+.kk-saran button{font:inherit;cursor:pointer;border:none;border-radius:999px;padding:2px 9px;
+  background:var(--warn-soft);color:var(--text)}
+.kk-saran button:hover{outline:1px solid var(--warn)}
+.kk-saran .kk-x{background:none;color:var(--text-dim);padding:2px 6px}
+.kk-ajar{border-color:var(--accent-2);color:var(--text)}
 /* Peringatan alamat file:// — izin mikrofon tidak tersimpan di sana, sehingga
    Chrome bertanya ulang tiap sesi baru dan tiap pertanyaan memutus rekaman. */
 .notis{display:none;gap:14px;padding:16px 22px;border-radius:var(--radius);
@@ -2221,13 +2243,13 @@ function renderDashboard(){
   lb.style.display = aktif ? 'inline-flex' : 'none';
   if(aktif) lb.textContent = 'Lanjutkan: ' + aktif.judul + ' →';
   // masalah baru terkunci selama ada yang berjalan — tombol menonjol hanya satu: langkah berikutnya
-  document.getElementById('angkatBtn').className = 'btn btn-lg ' + (aktif ? 'btn-ghost' : 'btn-primary');
+  document.getElementById('angkatBtn').className = 'btn btn-lg ' + (aktif ? 'btn-soft-accent' : 'btn-primary');
 
   // Tutup Sesi baru relevan setelah ada kesimpulan — menjaga bar tombol tetap ringkas
   const tb = document.getElementById('tutupBtn');
   tb.style.display = masalahSelesai().length ? 'inline-flex' : 'none';
   // selagi masih ada pembahasan berjalan, penutupan bukan langkah berikutnya — jangan bersaing dengan "Lanjutkan"
-  tb.className = 'btn btn-lg ' + (aktif ? 'btn-ghost' : 'btn-wi');
+  tb.className = 'btn btn-lg ' + (aktif ? 'btn-soft-wi' : 'btn-wi');
 }
 
 /* Diklik dari titik pengangkat masalah di Jaring Forum (lihat renderJaring).
@@ -2614,6 +2636,409 @@ function koreksiIstilah(teks){
 }
 
 /* ------------------------------------------------------------------
+   KOREKSI KONTEKS — membetulkan kata janggal hasil dikte
+   Kamus istilah di atas hanya mengenal salah dengar yang sudah dicatat.
+   Lapis ini menangani sisanya dengan menimbang beberapa bukti per kata:
+     1. katanya asing   — tidak ada di leksikon, istilah, nama daerah,
+                          maupun kata yang sering muncul di catatan lama
+     2. ada pengganti yang ejaan/bunyinya sangat mirip (beda 1–2 huruf)
+     3. pengganti itu cocok dengan kata sebelum/sesudahnya
+     4. mesin suara sendiri ragu pada kalimat itu
+     5. PTP pernah membetulkan kesalahan yang sama dengan tangan
+   Bukti kuat & tunggal -> diganti otomatis (bisa dibatalkan sekali klik).
+   Bukti setengah-setengah -> hanya disarankan, teks tidak disentuh.
+   Semua pembetulan & pembatalan PTP diingat di browser ini (KK_KEY).
+   ------------------------------------------------------------------ */
+const KK_KEY = 'orbit-koreksi-belajar-v1';
+
+/* Leksikon: kata dasar & kata tugas Bahasa Indonesia yang umum, ditambah
+   kosakata pendapatan daerah. Bentuk berimbuhan dikenali lewat
+   pengupasan imbuhan (bentukDasar), jadi cukup kata dasarnya. */
+const LEKSIKON = new Set(`
+yang dan di ke dari ini itu dengan untuk pada adalah ialah yaitu yakni dalam tidak tak akan juga atau ada oleh sudah telah bisa dapat saya aku kami kita mereka dia ia anda engkau kamu beliau bapak ibu pak bu saudara
+kalau jika jikalau apabila bila karena sebab sehingga tetapi tapi namun melainkan sedangkan padahal agar supaya bahwa seperti bagai sebagai masih belum lagi hanya saja pun lah kah tah nya ya iya ok oke bukan jangan mau ingin harus wajib perlu boleh mungkin barangkali
+sangat lebih paling kurang cukup terlalu sekali amat begitu begini demikian tersebut sini situ sana mana apa siapa kapan bagaimana gimana mengapa kenapa berapa setiap tiap semua seluruh segala segenap para beberapa banyak sedikit bagian sebagian masing
+satu dua tiga empat lima enam tujuh delapan sembilan sepuluh sebelas belas puluh ratus ribu juta miliar milyar triliun persen nol pertama kali antara sejak hingga sampai sambil selama setelah sesudah sebelum ketika saat waktu sewaktu sedang lagi pernah segera langsung kemudian lalu terus selalu sering jarang kadang biasa
+hari minggu pekan bulan tahun jam menit detik pagi siang sore malam kemarin besok lusa sekarang kini nanti tadi dulu baru lama awal akhir tengah pertengahan triwulan semester periode masa tempo jatuh
+senin selasa rabu kamis jumat sabtu januari februari maret april mei juni juli agustus september oktober november desember
+oh eh nah wah ayo mari silakan terima kasih maaf tolong permisi selamat salam assalamualaikum wassalamualaikum wr wb pagi
+hal cara jalan jalur arah tujuan maksud makna arti contoh misal misalnya umpama terkait kait mengenai tentang soal perihal menurut sesuai berdasarkan dasar landasan atas bawah dalam luar depan belakang samping sebelah antar lintas
+orang manusia warga masyarakat rakyat penduduk publik umum pihak kalangan kelompok golongan tim anggota ketua kepala pimpinan pemimpin atasan bawahan staf pegawai karyawan petugas pejabat aparat aparatur asn pns honorer pppk
+kerja karya bina bangun buat bikin jadi pakai guna laku lakukan laksana jalan jalankan ikut turut ambil beri kasih terima dapat peroleh capai raih hasil hasilkan tingkat naik turun tambah kurang ubah ganti tukar pindah alih
+lihat pandang tonton dengar baca tulis catat ketik isi kirim antar ajak minta tanya jawab bilang kata sebut ucap bicara cerita sampai sampaikan jelas terang tunjuk tampil tampak muncul hilang ingat lupa tahu kenal paham mengerti pikir rasa kira duga harap mohon
+mulai henti selesai tuntas lanjut tunda tunggu cepat lambat segera tepat telat terlambat lama singkat pendek panjang besar kecil tinggi rendah luas sempit jauh dekat berat ringan mudah sulit susah gampang rumit sederhana baik buruk jelek bagus benar salah betul tepat keliru
+baru lama tua muda kuat lemah aman bahaya rawan penting utama pokok inti khusus umum biasa luar istimewa resmi sah legal formal nyata riil aktual ideal optimal maksimal minimal efektif efisien produktif positif negatif normal wajar
+ada punya milik miliki simpan jaga pelihara rawat urus atur kelola tata susun rancang rencana siap siapkan sedia ada adakan gelar selenggara laksana adakan hadir datang pergi pulang masuk keluar tiba berangkat kembali balik
+uang dana biaya ongkos harga nilai jumlah total besaran angka nominal rupiah rp saldo kas modal aset harta kekayaan utang hutang piutang tagih bayar lunas cicil angsur setor setoran terima pungut potong kena kenakan beban tanggung
+jual beli dagang niaga usaha bisnis toko warung pasar mal kios lapak gerai kantor gedung rumah tanah bangunan lahan sawah kebun hutan tambang pabrik gudang hotel penginapan losmen restoran rumah makan kafe kedai katering hiburan karaoke bioskop
+mobil motor kendaraan truk bus angkot kapal pesawat kereta jalan raya parkir terminal pelabuhan bandara stasiun
+air listrik lampu gas minyak bahan bakar bensin solar energi rokok tembakau burung walet sarang mineral logam batu batuan pasir kerikil tanah liat
+data informasi keterangan berita kabar laporan catatan dokumen berkas arsip formulir blanko surat naskah akta sertifikat bukti kuitansi nota faktur struk tanda resi kartu nomor kode nama alamat telepon email
+sistem aplikasi teknologi digital elektronik online daring luring offline internet jaringan server komputer laptop ponsel hp android web situs portal fitur menu tombol layar akun login sandi kata
+integrasi interkoneksi koneksi kolaborasi sinergi koordinasi komunikasi sosialisasi edukasi literasi informasi publikasi promosi kampanye iklan baliho spanduk reklame media sosial
+layan layanan pelayanan loket antrian antre kanal saluran mobil keliling jemput bola gerai mal kios drive thru
+pajak retribusi daerah pusat pemerintah pemerintahan negara nasional provinsi kabupaten kota kecamatan kelurahan desa kampung dusun wilayah kawasan zona lokasi tempat titik
+pendapatan penerimaan pemasukan asli bea perolehan hak objek subjek wajib nilai jual pengenaan tarif dasar ketetapan tagihan tunggakan denda sanksi bunga administrasi keberatan banding gugatan pengurangan pembebasan keringanan insentif stimulus pemutihan diskon potongan
+penagihan penyitaan sita lelang pemeriksaan periksa pengawasan awas pendataan pendaftaran daftar penetapan tetap pemungutan pembayaran penyetoran pelaporan lapor intensifikasi ekstensifikasi potensi realisasi target sasaran capaian anggaran belanja transfer alokasi bagi hasil fiskal kapasitas kemandirian mandiri rasio efektivitas efisiensi kontribusi pertumbuhan tumbuh
+regulasi aturan peraturan undang ketentuan kebijakan keputusan putusan instruksi edaran pedoman petunjuk teknis juknis juklak prosedur mekanisme standar operasional
+dinas badan bidang seksi subbidang bagian unit lembaga instansi institusi organisasi perangkat satuan dewan komisi kementerian direktorat jenderal sekretariat inspektorat kejaksaan kepolisian pengadilan bank kantor cabang pembantu
+bupati walikota wali gubernur menteri presiden camat lurah kades sekda sekretaris kepala kabid kasi kasubbid kadis direktur
+notaris pejabat pembuat akta penilai appraisal juru sita pemeriksa operator verifikator validator admin
+inovasi praktik baik terbaik replikasi adopsi adaptasi forum konsultasi diskusi musyawarah rapat pertemuan acara kegiatan program proyek tanggapan pendapat masukan saran usul usulan kritik masalah kendala hambatan tantangan persoalan isu solusi jalan keluar kesimpulan rekomendasi tindak lanjut narasumber peserta fasilitator pelatihan diklat bimtek kelas materi modul sesi
+pengalaman pelajaran belajar ajar latih uji coba percontohan pilot piloting proses tahap tahapan langkah strategi taktik metode pendekatan model pola skema konsep gagasan ide pemikiran
+kepatuhan patuh taat sadar kesadaran disiplin jujur terbuka transparan akuntabel tanggung jawab integritas kepercayaan percaya yakin
+naik turun stagnan stabil meningkat menurun signifikan drastis tajam pesat perlahan bertahap
+peta pemetaan geospasial spasial survei lapangan verifikasi validasi pemutakhiran mutakhir update basis cocok padan pemadanan sinkron sinkronisasi
+kendala lemah kelemahan kekuatan peluang ancaman risiko dampak pengaruh manfaat keuntungan untung rugi kerugian
+sudah belum masih akan sedang baru pernah hampir nyaris kurang lebih sekitar kira kurang lebih rata merata
+anak orang tua keluarga rumah tangga warga pemilik penyewa pengusaha pedagang pelaku umkm usahawan investor developer pengembang kontraktor vendor pihak ketiga mitra
+lahir hidup mati sakit sehat makan minum tidur bangun duduk berdiri jalan lari naik turun buka tutup tarik dorong angkat taruh letak pasang lepas cabut potong sambung hubung
+kenyataan fakta bukti realita kondisi keadaan situasi posisi status tingkat level kategori jenis macam ragam tipe kelas golongan klasifikasi
+rumus hitung perhitungan kalkulasi estimasi proyeksi asumsi perkiraan rata median persentase proporsi porsi bagian komposisi struktur
+mudah murah mahal gratis bebas lunas penuh kosong habis sisa lebih kurang tambahan ekstra
+kemudian selanjutnya berikutnya sebelumnya terakhir pertama awalnya akhirnya intinya pokoknya jadi maka oleh karena itu dengan demikian selain kecuali termasuk misalnya antara lain
+tolong mohon izin bantu bantuan dukung dukungan sokong peran fungsi tugas wewenang kewenangan tanggung kewajiban hak
+cepat tanggap respon respons reaksi umpan balik keluhan aduan pengaduan komplain kepuasan puas indeks survei
+sepanjang selebihnya semacam sejenis setidaknya sekurang sebanyak sebesar setinggi serendah secepatnya sesegera
+sih kok dong deh kan loh lho toh pula pula malah bahkan justru tentu pasti jelas memang benar
+baik buruk banyak sedikit seluruh semua semuanya kesemuanya
+kemarin tadi barusan nanti esok
+memang hanya cuma sekadar sekedar saja
+punya ada tiada nihil
+gimana bagaimana begitu gitu gini begini
+abad abadi abai abu acak acara acu adab adik adil aduk afiliasi agak agama agen agenda agresif ahli aib air ajar akal akar akhir akibat akrab aksara akses aksi aktif aktivitas akun akurat alam alami alas alasan alat album alias alih alir alot alur aman amanat amat ambang ambil ambisi amuk anak analis analisa analisis ancam anda andal andil aneh angan anggap anggar anggota angin angka angkat angkut aniaya anjur antar antik antre antusias anut apresiasi april arah arsip arti artikel asah asal asas asing asli asumsi asuransi atap atur awas awal awam ayah
+babak badan bagi bagus bahan bahas bahasa bahu bait baja bakal bakar bakat baku balai balas balik banding bandung bangga bangkit bangku bangun banjir bantah bantu banyak barang baris baru basah basi batal batas batin batu bawa bayang bayar bebas beban beda bekal bekas bela belah belanja beli benah benar benci benda bendahara bengkel bentang bentuk benturan beras berat beri berita bersih besar betul biasa biaya bicara bidang bijak bimbing bina binatang bingung bintang biro bisik bisnis bocor bodoh bohong boleh bonus borong bosan buang buat budaya bujuk bukti buku bulat bumi bunga bunyi buru buruh buruk busuk butuh
+cabang cacat cadang cair cakap cakup calon campur canggih cantum cap capai cari catat cegah celah cemas cepat cerdas cerita cermat cermin cetak cicil cinta cipta ciri citra coba cocok contoh copot cuci cukup cukai curang curi
+daftar dagang daging dahulu dakwa dalam dalih damai dampak dampingi danau dapur darat darurat dasar datang datar dekat demo denda dengar depan deras derajat desak desain detail dewasa diam didik digit dikit dinamis dingin diri disiplin diskon dokter dompet dorong dosa drone dua duduk duga dukung dunia durasi
+edar edukasi efek ejaan ekonomi ekspor elak elektronik emas empat endap energi enggan erat esensi etika
+fakta faktor fasilitas fase fatal fisik fleksibel fokus foto frekuensi fungsi
+gabung gagal gagas gaji galak gali gambar gampang gandeng ganggu ganjil ganti garap garis gaya gedung gelap gelar gelombang gema gemar gembira gencar gerak gerakan giat gigih gilir global golong gotong gratis guna gugat gugur guru gusur
+habis hadap hadiah hadir hafal hak hakim halal halaman halang hambat hampir hancur handal hangat hanya harap harga harian harus hasil hati hebat hemat hendak hentikan hibah hidup hilang himbau imbau hindar hitung hormat hubung hukum hutan
+ibarat identik identitas ikat ikhlas iklim ikut ilmu imbal imbang impor indah induk industri info ingin ingat ingkar inisiatif instruksi insentif inti investasi irit isi istirahat istri izin
+jabat jadwal jaga jagat jaksa jalin jamin janji jarang jasa jatah jatuh jauh jawab jelang jelas jemput jenis jera jerat jika jiwa jual juang judul juga jumlah jurnal juru jurus justru
+kabar kabur kadar kaji kala kalah kali kalimat kamar kampanye kampus kantong kapal karcis karena karir karya kasar kasus kategori kaum kawal kawasan kaya kebun kecil kecewa keliling kelola keluar keluarga keluh kembang kemas kena kenal kenang kendala kendali kendara kentara kepala keras kering kertas keruk kesan khas khawatir khusus kian kilat kinerja kirim kisah klaim klarifikasi kokoh kolom komitmen kompak kompetensi komponen konflik konsisten konsumen kontrak kontrol kota kotor kreatif krisis kritis kuasa kuat kumpul kunci kunjung kuota kupas kursi kurun kutip
+laba labil lahan lain laju laku lalai lalu lama lambat lampau lampir lancar landas langgar langka langkah langsung lanjut lapang lapor lapis larang laris latar latih lawan layak layar lebar lebih leluasa lemah lembaga lembar lengkap lepas lestari letak lewat libat liburan lihat lima lindung lingkung lingkungan lintas lipat listrik logis lokal lolos lomba luas lugas lulus lunas lupa luput
+maju makmur maksud makin malas maling malu mampu mana manfaat mangkir manis manja mantap marah maraton masuk mata materi mati mau media mekar menang mengerti menit merah merata mesin metode milik minat minta mirip miskin mitra modal modern modus mogok mohon motivasi muat mudah mudik muka mula mulai mulia mulus mundur murah murni musim musuh mutlak mutu
+nafkah naik nakal nalar nama nanti napas nasib nasihat negeri nikmat nilai niscaya niat nomor nominal norma nyaman nyata
+objektif obrol olah omong operasi opini optimal optimis orang otomatis otonomi
+pacu padat padam padan padu paham pahit pajang paket paksa paling palsu panas pandai pandu pangkas panggil panitia pantau papan para parah partisipasi pasang pasar pasif pasti patok patuh patut pecah pecat peduli pegang pekerja peka pelihara peluang penat pengaruh pentas perangkat peran perintah perlu persen pesan pesat peserta petak piala pihak pikir pilih pimpin pindah pinjam pintar pintu pisah plafon pokok pola polisi populer porsi positif posko potong praktis prestasi prima prinsip prioritas proaktif produk profesional profil program proporsional protes proyek pukul pulih pulang puncak pungli punya pupuk pusat pusing puskesmas putar putus puas
+rabat racik ragu rahasia raih rajin rakit ramah ramai rancang rantai rapat rapi rapor rasa rata rawan rawat rayu reaksi realistis redam rekam rekan rekap rekening relawan rela remaja rencana rendah renggang rentan resah resmi respons ribet ringan ringkas rinci risiko rombak rugi rumah rumit rumus runtut rusak rutin
+sabar sadar sah saing sajikan saksi salah salur sama sambut sampah sampai sampel sanggup santai sapa saran sasar sasaran sayang sebar sebut sedia segar sehat sejahtera sejarah sejuk sekolah selamat selang selaras selesai selidik semangat sempat sempit sempurna senang sendiri sengaja sengketa sepakat serah serap serapan seragam serba serius sertifikat sesal sesuai setara setia setuju sewa siaga siap siar sidak sidang sifat sikap sila silang simak simpan simpang singkat singgung sinergi sisa sisi sisir sita situs sorot stabil staf status stiker strategis struktur subsidi suka sukarela sukses suku sulit sumber sumbang sunyi supir surut susut syarat
+tabung tagih tahan tahap tahu tajam takut talang taman tambah tampung tanam tanda tandatangan tangan tangani tangga tanggap tanggung tangkap tanya tarik target taruh tata tawar tegas teguh teguran tekan teknis telaah teliti teman tempat tempel tempuh temu tenaga tenang tentu tepat terap terbit terima terang terus tetap tiba tidur timbang timbul timpang tindak tingkat tinjau tipis titik tokoh tolak tolong tonggak total transaksi transparan tuduh tugas tujuan tuju tukar tulus tumpang tumpuk tunai tunda tunggak tunggal tunjang tunjuk tuntas tuntut turun tutup tutur
+uang ubah ucap udara ujar uji ukur ulang ulas umum umur unggah unggul ungkap unik unjuk untung upaya urai urgen urus urut usaha usai usang usia usul utama utang utuh
+validasi variasi versi visi vital
+wadah wajah wajar wajib waktu walau wali wanita warga waris warna warung waspada wawancara wewenang wilayah wisata wujud
+yakin yayasan
+zakat zaman zona
+alat perekam kamera mesin printer kertas tinta stempel materai meterai cap
+minimarket swalayan kantor pos dompet ewallet gopay ovo dana linkaja shopeepay tokopedia marketplace
+undi undian hadiah lomba kuis
+bumi langit laut sungai danau gunung pantai pulau desa kota
+sekolah madrasah pesantren kampus universitas rumah sakit puskesmas posyandu klinik apotek masjid gereja pura vihara
+efek jera kuasa khusus jaksa pengacara hakim pengadilan polisi
+sampah persampahan kebersihan pasar terminal parkir pemakaman kuburan
+optimalisasi digitalisasi modernisasi standardisasi sosialisasi edukasi simplifikasi
+drone satelit citra foto video rekaman
+bingung jelas paham tahu
+`.split(/\s+/).filter(Boolean));
+
+/* Pasangan kata yang lazim di forum pendapatan daerah. Dipakai sebagai
+   bukti konteks sejak hari pertama, sebelum ORBIT punya catatan sendiri. */
+const FRASA_DOMAIN = `pajak daerah|retribusi daerah|wajib pajak|wajib retribusi|objek pajak|subjek pajak|nilai jual|jual objek|pendapatan asli|asli daerah|pendapatan daerah|tunggakan pajak|piutang pajak|kendaraan bermotor|pajak kendaraan|balik nama|bahan bakar|pajak restoran|pajak hotel|pajak hiburan|pajak parkir|pajak reklame|pajak air|air tanah|air permukaan|sarang burung|burung walet|mineral bukan|bukan logam|logam dan|dan batuan|penerangan jalan|tenaga listrik|bea perolehan|perolehan hak|hak atas|atas tanah|tanah dan|dan bangunan|pemerintah daerah|pemerintah pusat|kepala daerah|peraturan daerah|badan pendapatan|target pendapatan|realisasi pendapatan|realisasi penerimaan|basis data|data wajib|tindak lanjut|praktik baik|jemput bola|mobil keliling|surat ketetapan|surat tagihan|surat pemberitahuan|tanda terima|nomor objek|zona nilai|nilai tanah|penilaian objek|pemutakhiran data|pendataan ulang|sanksi administrasi|pengurangan pokok|penghapusan sanksi|bagi hasil|dana bagi|dana alokasi|alokasi umum|alokasi khusus|transfer ke|tahun anggaran|tahun lalu|tahun ini|bulan ini|kami di|di daerah|daerah kami|tempat kami|kabupaten kami|kota kami`.split('|');
+
+let KK = {ganti:{}, konteks:{}, kenal:{}, tolak:{}};
+function muatKK(){
+  try{
+    const r = JSON.parse(localStorage.getItem(KK_KEY));
+    if(r && typeof r === 'object') KK = Object.assign({ganti:{}, konteks:{}, kenal:{}, tolak:{}}, r);
+  }catch(e){}
+}
+function simpanKK(){ try{ localStorage.setItem(KK_KEY, JSON.stringify(KK)); }catch(e){} kkCache = null; }
+muatKK();
+
+const HURUF = 'A-Za-zÀ-ÖØ-öø-ÿ';
+const RE_KATA = new RegExp('[' + HURUF + ']+(?:-[' + HURUF + ']+)*', 'g');
+function kataKata(t){ return normal(t).match(RE_KATA) || []; }
+
+/* Kemungkinan kata dasar dari bentuk berimbuhan. Sengaja longgar:
+   salah mengira kata dikenal hanya berarti ORBIT tidak membetulkannya,
+   sedangkan salah mengira kata asing bisa mengubah kata yang benar. */
+const AWALAN  = ['menge','meng','meny','mem','men','me','penge','peng','peny','pem','pen','pe',
+                 'per','pel','ber','be','bel','ter','te','di','ke','se'];
+const AKHIRAN = ['kan','an','i'];
+const PARTIKEL = ['lah','kah','pun','tah','nya','ku','mu'];
+
+function kupasAwalan(x){
+  const r = [];
+  AWALAN.forEach(p => {
+    if(!x.startsWith(p) || x.length - p.length < 3) return;
+    const sisa = x.slice(p.length);
+    r.push(sisa);
+    if(p.endsWith('ny')) r.push('s' + sisa);          // menyusun -> susun
+    else if(p.endsWith('ng')) r.push('k' + sisa);     // mengirim -> kirim
+    else if(p.endsWith('m')) r.push('p' + sisa);      // memakai  -> pakai
+    else if(p.endsWith('n')) r.push('t' + sisa);      // menulis  -> tulis
+  });
+  return r;
+}
+function bentukDasar(w){
+  const a = [w];
+  PARTIKEL.forEach(p => { if(w.endsWith(p) && w.length - p.length >= 3) a.push(w.slice(0, -p.length)); });
+  const b = [];
+  a.forEach(x => { b.push(x); AKHIRAN.forEach(s => { if(x.endsWith(s) && x.length - s.length >= 3) b.push(x.slice(0, -s.length)); }); });
+  const c = [];
+  b.forEach(x => { c.push(x); kupasAwalan(x).forEach(y => { c.push(y); kupasAwalan(y).forEach(z => c.push(z)); }); });
+  return c;
+}
+
+/* Kosakata dibangun dari leksikon + istilah + nama daerah + semua catatan
+   yang tersimpan (frekuensi kata & pasangan kata berurutan). Disimpan
+   sebentar supaya tidak dibangun ulang di tiap potongan kalimat. */
+let kkCache = null, kkWaktu = 0;
+function bunyi(w){
+  return w.replace(/kh/g,'k').replace(/sy/g,'s').replace(/dz/g,'z').replace(/ph/g,'f')
+          .replace(/v/g,'f').replace(/q/g,'k').replace(/x/g,'ks').replace(/oe/g,'u')
+          .replace(/dj/g,'j').replace(/tj/g,'c').replace(/([a-z])\1+/g,'$1').replace(/([aiueo])h$/,'$1');
+}
+function kosakata(){
+  if(kkCache && Date.now() - kkWaktu < 8000) return kkCache;
+  const frek = new Map(), pasang = new Map(), domain = new Set();
+  const tambahTeks = t => {
+    const k = kataKata(t);
+    k.forEach((w, i) => {
+      frek.set(w, (frek.get(w) || 0) + 1);
+      if(i){ const p = k[i-1] + ' ' + w; pasang.set(p, (pasang.get(p) || 0) + 1); }
+    });
+  };
+  KAMUS_ISTILAH.forEach(([b]) => kataKata(b).forEach(w => domain.add(w)));
+  ISTILAH_ARAH.concat(FRASA_DOMAIN).forEach(f => { kataKata(f).forEach(w => domain.add(w)); tambahTeks(f); });
+  WILAYAH.forEach(w => kataKata(w.c).forEach(x => domain.add(x)));
+  Object.values(KK.ganti).concat(Object.values(KK.konteks))
+    .forEach(g => kataKata(g.ke).forEach(x => domain.add(x)));
+  const kumpul = (o, d) => {
+    if(o == null || d > 8) return;
+    if(typeof o === 'string'){ if(o.length > 12 && o.includes(' ')) tambahTeks(o); }
+    else if(typeof o === 'object') Object.values(o).forEach(x => kumpul(x, d + 1));
+  };
+  try{ kumpul(S, 0); }catch(e){}
+  try{ kumpul(N, 0); }catch(e){}
+
+  // calon pengganti: akar leksikon + istilah + kata yang sudah sering muncul
+  const calon = new Set(domain);
+  LEKSIKON.forEach(w => { if(w.length >= 3) calon.add(w); });
+  frek.forEach((n, w) => { if(n >= 3 && w.length >= 3) calon.add(w); });
+  const perPanjang = new Map(), kunciBunyi = new Map();
+  calon.forEach(w => {
+    if(!perPanjang.has(w.length)) perPanjang.set(w.length, []);
+    perPanjang.get(w.length).push(w);
+    kunciBunyi.set(w, bunyi(w));
+  });
+  kkCache = {frek, pasang, domain, perPanjang, kunciBunyi};
+  kkWaktu = Date.now();
+  return kkCache;
+}
+
+function kataDikenal(w, v){
+  if(w.length <= 3 || /\d/.test(w)) return true;
+  if(KK.kenal[w]) return true;
+  if(w.includes('-')) return w.split('-').every(x => kataDikenal(x, v));
+  if(v.domain.has(w) || (v.frek.get(w) || 0) >= 3) return true;
+  return bentukDasar(w).some(x => LEKSIKON.has(x) || v.domain.has(x));
+}
+
+/* Jarak ejaan (Damerau–Levenshtein terbatas): berapa huruf yang harus
+   diubah/ditukar. Berhenti lebih awal bila sudah melewati batas. */
+function jarak(a, b, maks){
+  if(Math.abs(a.length - b.length) > maks) return maks + 1;
+  const m = a.length, n = b.length;
+  let dua = null, satu = Array.from({length: n + 1}, (_, j) => j);
+  for(let i = 1; i <= m; i++){
+    const kini = [i];
+    let minBaris = i;
+    for(let j = 1; j <= n; j++){
+      const ongkos = a[i-1] === b[j-1] ? 0 : 1;
+      let d = Math.min(satu[j] + 1, kini[j-1] + 1, satu[j-1] + ongkos);
+      if(dua && i > 1 && j > 1 && a[i-1] === b[j-2] && a[i-2] === b[j-1]) d = Math.min(d, dua[j-2] + 1);
+      kini[j] = d;
+      if(d < minBaris) minBaris = d;
+    }
+    if(minBaris > maks) return maks + 1;
+    dua = satu; satu = kini;
+  }
+  return satu[n];
+}
+
+function calonPengganti(w, v){
+  const hasil = new Map();   // kata -> jarak
+  const coba = (inti, pre, suf) => {
+    if(inti.length < 4) return;
+    const maks = inti.length >= 7 ? 2 : 1;
+    const bi = bunyi(inti);
+    for(let L = inti.length - maks; L <= inti.length + maks; L++){
+      (v.perPanjang.get(L) || []).forEach(c => {
+        let d = jarak(inti, c, maks);
+        if(d > maks){ if(v.kunciBunyi.get(c) === bi) d = 1; else return; }
+        else if(d > 1 && v.kunciBunyi.get(c) === bi) d = 1;   // bunyinya sama
+        if(d === 0) return;
+        const k = pre + c + suf;
+        if(k === w) return;
+        if(!hasil.has(k) || hasil.get(k) > d) hasil.set(k, d);
+      });
+    }
+  };
+  coba(w, '', '');
+  // bentuk berimbuhan sederhana: "dibayarr" -> di + bayar
+  ['di','ter','ber','se','ke','per','pe'].forEach(p => {
+    if(!w.startsWith(p)) return;
+    const sisa = w.slice(p.length);
+    coba(sisa, p, '');
+    ['kan','an','nya','i'].forEach(s => { if(sisa.endsWith(s)) coba(sisa.slice(0, -s.length), p, s); });
+  });
+  ['kan','an','nya','lah'].forEach(s => { if(w.endsWith(s)) coba(w.slice(0, -s.length), '', s); });
+  return hasil;
+}
+
+function nilaiCalon(c, d, prev, next, conf, v){
+  let n = d === 1 ? 3 : 1;
+  if(v.domain.has(c) || (v.frek.get(c) || 0) >= 3) n += 1;
+  let ktx = 0;
+  if(prev && v.pasang.get(prev + ' ' + c)) ktx += 2;
+  if(next && v.pasang.get(c + ' ' + next)) ktx += 2;
+  n += Math.min(3, ktx);
+  if(conf > 0 && conf < 0.7) n += 1;   // mesin suara sendiri ragu
+  return n;
+}
+
+/* Huruf besar ikut kata aslinya; singkatan/nama (BPHTB, Sleman) dibiarkan. */
+function samakanHuruf(asli, ke){
+  if(/[A-Z]/.test(ke)) return ke;
+  return /^[A-Z]/.test(asli) ? ke.charAt(0).toUpperCase() + ke.slice(1) : ke;
+}
+
+/* Kata yang tidak pernah ditebak-tebak: pendek, berangka, singkatan
+   huruf besar, dan nama diri (huruf besar di tengah kalimat). */
+function bolehDiperiksa(asli, i, teks){
+  if(asli.length < 4 || /\d/.test(asli)) return false;
+  if(asli === asli.toUpperCase()) return false;
+  if(/^[A-Z]/.test(asli) && i > 0 && !/[.!?]\s*$/.test(teks.slice(0, i))) return false;
+  return true;
+}
+
+/** Membetulkan satu potongan teks dikte. `sebelum` = isi kolom sebelumnya
+    (untuk konteks kata pertama). Mengembalikan teks baru beserta daftar
+    kata yang diganti dan yang hanya disarankan (posisi relatif). */
+function koreksiKonteks(teks, sebelum, conf){
+  const v = kosakata();
+  const ganti = [], saran = [];
+  const token = [];
+  const re = new RegExp(RE_KATA.source, 'g');
+  let m;
+  while((m = re.exec(teks))) token.push({s: m[0], i: m.index});
+  let prev = kataKata(sebelum || '').slice(-1)[0] || '';
+  let keluar = '', pos = 0;
+  token.forEach((tk, j) => {
+    const asli = tk.s, w = asli.toLowerCase();
+    const next = token[j+1] ? token[j+1].s.toLowerCase() : '';
+    let ke = null, cal = null;
+    const kt = KK.konteks[prev + ' ' + w], gl = KK.ganti[w];
+    if(kt && !KK.tolak[w + '>' + kt.ke.toLowerCase()]) ke = kt.ke;          // pelajaran PTP, dengan konteks
+    else if(gl && !KK.tolak[w + '>' + gl.ke.toLowerCase()]) ke = gl.ke;     // pelajaran PTP, umum
+    else if(bolehDiperiksa(asli, tk.i, teks) && !kataDikenal(w, v)){
+      const daftar = [...calonPengganti(w, v)]
+        .filter(([c]) => !KK.tolak[w + '>' + c])
+        .map(([c, d]) => ({c, n: nilaiCalon(c, d, prev, next, conf, v)}))
+        .sort((a, b) => b.n - a.n);
+      if(daftar.length){
+        const a = daftar[0], b = daftar[1];
+        if(a.n >= 5 && a.n - (b ? b.n : 0) >= 2) ke = a.c;
+        else if(a.n >= 3) cal = daftar.slice(0, 3).map(x => samakanHuruf(asli, x.c));
+      }
+    }
+    keluar += teks.slice(pos, tk.i);
+    if(ke && ke.toLowerCase() !== w){
+      const jadi = samakanHuruf(asli, ke);
+      ganti.push({dari: asli, ke: jadi, i: keluar.length});
+      keluar += jadi;
+      prev = jadi.toLowerCase();
+    }else{
+      if(cal) saran.push({kata: asli, calon: cal, i: keluar.length});
+      keluar += asli;
+      prev = w;
+    }
+    pos = tk.i + asli.length;
+  });
+  keluar += teks.slice(pos);
+  return {teks: keluar, ganti, saran};
+}
+
+/* Mesin suara bisa memberi beberapa tebakan untuk satu kalimat. Dipilih
+   yang paling sedikit kata asingnya & paling banyak istilah dikenalnya;
+   tebakan pertama tetap dipakai kecuali yang lain jelas lebih cocok. */
+function pilihTebakan(res){
+  const pertama = res[0];
+  if(res.length < 2) return pertama.transcript;
+  const v = kosakata();
+  const skor = t => {
+    let n = 0;
+    kataKata(koreksiIstilah(t)).forEach(w => { if(!kataDikenal(w, v)) n -= 1.5; else if(v.domain.has(w)) n += 1; });
+    return n;
+  };
+  let best = pertama.transcript, skorBest = skor(best);
+  for(let k = 1; k < res.length; k++){
+    const t = res[k].transcript, s = skor(t);
+    if(s >= skorBest + 1){ best = t; skorBest = s; }
+  }
+  return best;
+}
+
+/** Mengganti satu kata utuh di kolom, memilih kemunculan yang paling dekat
+    dengan posisi perkiraan. Posisi kursor PTP dijaga. */
+function gantiDiKolom(field, cari, jadi, kira){
+  const re = new RegExp('(^|[^' + HURUF + '])(' + lolosRegex(cari) + ')(?![' + HURUF + '])', 'g');
+  let m, terbaik = -1, beda = Infinity;
+  while((m = re.exec(field.value))){
+    const i = m.index + m[1].length, d = Math.abs(i - kira);
+    if(d < beda){ beda = d; terbaik = i; }
+  }
+  if(terbaik < 0) return false;
+  const a = field.selectionStart, b = field.selectionEnd, geser = jadi.length - cari.length;
+  field.value = field.value.slice(0, terbaik) + jadi + field.value.slice(terbaik + cari.length);
+  const atur = x => x > terbaik ? x + geser : x;
+  try{ field.setSelectionRange(atur(a), atur(b)); }catch(e){}
+  return true;
+}
+
+/** Membaca suntingan manual PTP: bila tepat satu kata diganti dengan kata
+    yang mirip ejaannya, itu salah dengar yang dibetulkan — diingat. */
+function belajarDariSuntingan(lama, baru){
+  const ta = lama.match(RE_KATA) || [], tb = baru.match(RE_KATA) || [];
+  let p = 0;
+  while(p < ta.length && p < tb.length && ta[p] === tb[p]) p++;
+  let s = 0;
+  while(s < ta.length - p && s < tb.length - p && ta[ta.length-1-s] === tb[tb.length-1-s]) s++;
+  const A = ta.slice(p, ta.length - s), B = tb.slice(p, tb.length - s);
+  if(A.length !== 1 || B.length !== 1) return null;
+  const a = A[0].toLowerCase(), b = B[0], bl = b.toLowerCase();
+  if(a === bl || a.length < 3 || b.length < 4) return null;
+  // kata yang jauh berbeda = PTP mengganti pilihan kata, bukan salah dengar
+  if(jarak(a, bl, 3) > Math.max(2, Math.floor(a.length / 3)) && bunyi(a) !== bunyi(bl)) return null;
+  const v = kosakata();
+  if(!kataDikenal(bl, v) && !/^[A-Z]/.test(b)) return null;   // jangan ingat ketikan setengah jadi
+  const prev = p ? ta[p-1].toLowerCase() : '';
+  if(kataDikenal(a, v)){
+    // kata aslinya sah ("pajang"), jadi hanya dibetulkan bila didahului kata yang sama
+    if(!prev) return null;
+    const k = prev + ' ' + a;
+    KK.konteks[k] = {ke: b, n: ((KK.konteks[k] || {}).n || 0) + 1};
+  }else{
+    KK.ganti[a] = {ke: b, n: ((KK.ganti[a] || {}).n || 0) + 1};
+  }
+  delete KK.tolak[a + '>' + bl];
+  simpanKK();
+  return {dari: A[0], ke: b};
+}
+
+/* ------------------------------------------------------------------
    PENGARAHAN KOSAKATA
    API pengenal suara bisa diberi daftar istilah agar ia lebih condong
    mengenalinya. Kemampuan ini masih bergulir bertahap di Chromium, jadi
@@ -2676,14 +3101,105 @@ function pasangDikte(inputId, btnId, opsi){
   kap.className = 'dikte-kap';
   field.insertAdjacentElement('afterend', kap);
 
+  /* Baris koreksi di bawah kolom: kata yang dibetulkan otomatis (klik untuk
+     mengembalikan) dan kata yang hanya disarankan (klik saran untuk
+     memakainya, × bila kata itu memang benar). Tampil hanya bila ada isinya. */
+  const bar = document.createElement('div');
+  bar.className = 'kk-bar';
+  kap.insertAdjacentElement('afterend', bar);
+  let catatanKK = [];   // {jenis:'ganti'|'saran'|'ajar', ...}
+
+  const adaKata = k => new RegExp('(^|[^' + HURUF + '])' + lolosRegex(k) + '(?![' + HURUF + '])').test(field.value);
+  function segarkanBar(){
+    catatanKK = catatanKK.filter(c => c.jenis === 'ajar' ? Date.now() - c.t < 8000
+                                    : adaKata(c.jenis === 'ganti' ? c.ke : c.kata)).slice(-8);
+    bar.innerHTML = catatanKK.map((c, k) =>
+      c.jenis === 'ganti'
+        ? `<button type="button" class="kk-c kk-ganti" data-k="${k}" title="Dibetulkan otomatis. Klik untuk mengembalikan kata aslinya."><s>${esc(c.dari)}</s> → <b>${esc(c.ke)}</b><span class="kk-u">↶</span></button>`
+      : c.jenis === 'saran'
+        ? `<span class="kk-c kk-saran"><span class="kk-q">${esc(c.kata)}?</span>${c.calon.map((x, ci) =>
+            `<button type="button" data-k="${k}" data-c="${ci}" title="Ganti dengan kata ini">${esc(x)}</button>`).join('')}<button type="button" class="kk-x" data-k="${k}" data-x="1" title="Kata ini sudah benar, jangan ditandai lagi">×</button></span>`
+        : `<span class="kk-c kk-ajar">Diingat: ${esc(c.dari)} → ${esc(c.ke)}</span>`
+    ).join('');
+    bar.classList.toggle('on', catatanKK.length > 0);
+  }
+
+  /* Mengamati suntingan manual: cermin = isi kolom terakhir yang sudah
+     dibaca. Diproses setelah PTP berhenti mengetik sebentar atau pindah
+     kolom, supaya ketikan setengah jadi tidak ikut diingat. */
+  let cermin = field.value, tundaAjar = null;
+  function pelajariSuntingan(){
+    clearTimeout(tundaAjar); tundaAjar = null;
+    const baru = field.value;
+    if(baru === cermin) return;
+    const lama = cermin;
+    cermin = baru;
+    // PTP mengetik balik kata asli dari pembetulan otomatis = pembetulannya ditolak
+    const ditolak = catatanKK.find(c => c.jenis === 'ganti' && !adaKata(c.ke) && adaKata(c.dari));
+    if(ditolak){ tolakKoreksi(ditolak); return; }
+    const hasil = belajarDariSuntingan(lama, baru);
+    if(hasil) catatanKK.push({jenis:'ajar', dari: hasil.dari, ke: hasil.ke, t: Date.now()});
+    segarkanBar();
+  }
+  function tolakKoreksi(c){
+    const a = c.dari.toLowerCase(), b = c.ke.toLowerCase();
+    KK.tolak[a + '>' + b] = 1;
+    KK.kenal[a] = 1;
+    if(KK.ganti[a] && KK.ganti[a].ke.toLowerCase() === b) delete KK.ganti[a];
+    Object.keys(KK.konteks).forEach(k => { if(k.endsWith(' ' + a) && KK.konteks[k].ke.toLowerCase() === b) delete KK.konteks[k]; });
+    simpanKK();
+    catatanKK = catatanKK.filter(x => x !== c);
+    segarkanBar();
+  }
+  // perubahan oleh aplikasi sendiri: kabari pendengar lain, cermin ikut disamakan
+  function kabariBerubah(){
+    cermin = field.value;
+    field.dispatchEvent(new Event('input', {bubbles: true}));
+  }
+  field.addEventListener('focus', () => { if(!tundaAjar) cermin = field.value; });
+  field.addEventListener('input', e => {
+    if(!e.isTrusted){ cermin = field.value; segarkanBar(); return; }
+    clearTimeout(tundaAjar);
+    tundaAjar = setTimeout(pelajariSuntingan, 2500);
+  });
+  field.addEventListener('blur', () => { if(tundaAjar) pelajariSuntingan(); });
+
+  bar.addEventListener('mousedown', e => e.preventDefault());   // kursor tetap di kolom
+  bar.addEventListener('click', e => {
+    const t = e.target.closest('button[data-k]');
+    if(!t) return;
+    if(tundaAjar) pelajariSuntingan();
+    const c = catatanKK[+t.dataset.k];
+    if(!c) return;
+    if(c.jenis === 'ganti'){
+      if(gantiDiKolom(field, c.ke, c.dari, c.i)){ kabariBerubah(); tolakKoreksi(c); }
+    }else if(c.jenis === 'saran'){
+      if(t.dataset.x){
+        KK.kenal[c.kata.toLowerCase()] = 1;
+        simpanKK();
+      }else{
+        const pilih = c.calon[+t.dataset.c];
+        if(gantiDiKolom(field, c.kata, pilih, c.i)){
+          kabariBerubah();
+          KK.ganti[c.kata.toLowerCase()] = {ke: pilih, n: 1};
+          delete KK.tolak[c.kata.toLowerCase() + '>' + pilih.toLowerCase()];
+          simpanKK();
+        }
+      }
+      catatanKK = catatanKK.filter(x => x !== c);
+      segarkanBar();
+    }
+  });
+
   /* Menyisipkan teks final ke ISI KOLOM SAAT ITU, bukan ke salinan internal.
      Dua akibatnya, keduanya disengaja:
      1. Suntingan manual PTP tidak pernah tertimpa — teks baru ditambahkan di
         belakang apa pun yang sedang ada di kolom.
      2. Posisi kursor dikembalikan setelah penambahan, sehingga PTP bisa
         mengklik satu kata di tengah dan membetulkannya sambil dikte jalan. */
-  function sisipkan(teks){
+  function sisipkan(teks, conf){
     teks = koreksiIstilah(teks);
+    if(tundaAjar) pelajariSuntingan();   // suntingan PTP yang belum terbaca, baca dulu
 
     /* Nama daerah hanya dipanen dari kalimat PEMBUKA — saat kolom isi masih
        kosong dan kolom daerah belum terisi. Di tengah tanggapan, penyebutan
@@ -2707,7 +3223,10 @@ function pasangDikte(inputId, btnId, opsi){
     let posA = field.selectionStart, posB = field.selectionEnd;
     const diUjung = (posA >= panjangLama && posB >= panjangLama);
     const kini = field.value.replace(/\s+$/, '');
-    field.value = (kini ? kini + ' ' : '') + teks;
+    const awalan = kini ? kini + ' ' : '';
+    let kk = {teks, ganti: [], saran: []};
+    try{ kk = koreksiKonteks(teks, kini, conf || 0); }catch(err){}   // koreksi tak boleh menggagalkan dikte
+    field.value = awalan + kk.teks;
     const n = field.value.length;
     if(diUjung){
       field.setSelectionRange(n, n);          // mengetik di ujung terasa wajar
@@ -2715,6 +3234,9 @@ function pasangDikte(inputId, btnId, opsi){
       // kursor tetap di tempat PTP menaruhnya (dijaga agar tidak melewati batas)
       field.setSelectionRange(Math.min(posA, n), Math.min(posB, n));
     }
+    kk.ganti.forEach(g => catatanKK.push({jenis:'ganti', dari: g.dari, ke: g.ke, i: awalan.length + g.i}));
+    kk.saran.forEach(s => catatanKK.push({jenis:'saran', kata: s.kata, calon: s.calon, i: awalan.length + s.i}));
+    kabariBerubah();
   }
 
   /* ----------------------------------------------------------------
@@ -2752,6 +3274,7 @@ function pasangDikte(inputId, btnId, opsi){
     r.lang = 'id-ID';
     r.continuous = true;        // jangan berhenti tiap jeda kalimat
     r.interimResults = true;    // tampilkan yang sedang didengar
+    r.maxAlternatives = 3;      // beberapa tebakan, dipilih yang paling cocok (pilihTebakan)
     pasangArahKosakata(r);      // dipakai bila browsernya mendukung
 
     const hidup = () => (aktif && token === sesiKe);   // sesi basi diabaikan
@@ -2764,12 +3287,17 @@ function pasangDikte(inputId, btnId, opsi){
       if(!hidup()) return;
       terakhirAktif = Date.now();
       gagalBeruntun = 0;        // ada hasil masuk = sesi sehat
-      let selesai = '', sementara = '';
+      let selesai = '', sementara = '', yakin = 1;
       for(let i = e.resultIndex; i < e.results.length; i++){
-        const t = e.results[i][0].transcript;
-        if(e.results[i].isFinal) selesai += t; else sementara += t;
+        const res = e.results[i];
+        if(res.isFinal){
+          let t = res[0].transcript;
+          try{ t = pilihTebakan(res); }catch(err){}
+          selesai += t;
+          if(res[0].confidence > 0) yakin = Math.min(yakin, res[0].confidence);
+        }else sementara += res[0].transcript;
       }
-      if(selesai.trim()) sisipkan(selesai.trim());
+      if(selesai.trim()) sisipkan(selesai.trim(), yakin < 1 ? yakin : 0);
       adaSementara = !!sementara.trim();
       kap.textContent = (sementara.trim() || 'Mendengarkan…') + '  ·  ' + jam();
       if(perluSegar && !adaSementara) segarkan();   // hanya saat ada jeda bicara
