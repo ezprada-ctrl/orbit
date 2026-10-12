@@ -199,6 +199,8 @@ input,textarea,select{font-family:inherit;color:inherit}
   background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
   box-shadow:var(--shadow);
 }
+label.fl .opsional{font-weight:500;letter-spacing:0;text-transform:none;color:var(--text-dim)}
+.orang-rinci{color:var(--text-dim);font-size:.92em;margin-top:2px}
 label.fl{display:block;font-size:12.5px;font-weight:700;letter-spacing:.09em;
   text-transform:uppercase;color:var(--text-dim);margin-bottom:8px}
 .field{
@@ -1419,6 +1421,14 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
           <input class="field" id="inJudul" placeholder="Contoh: Piutang PBB-P2 tahun lama sulit ditagih">
         </div>
       </div>
+      <div id="barisPengangkat" style="display:none;margin-bottom:22px">
+        <label class="fl" for="inPengangkat">Nama pengangkat masalah <span class="opsional">· boleh dikosongkan</span></label>
+        <div class="combo" style="max-width:520px">
+          <input class="field" id="inPengangkat" autocomplete="off" role="combobox"
+            aria-autocomplete="list" aria-expanded="false" placeholder="Ketik nama dari daftar peserta…">
+          <div class="combo-pop" hidden></div>
+        </div>
+      </div>
       <div class="lbl-row">
         <label class="fl" for="inDesk">Uraian masalah</label>
         <button class="mic" id="micDesk" type="button" title="Mulai dikte suara">
@@ -1449,6 +1459,14 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
           <div class="combo">
             <input class="field" id="tgDaerah" autocomplete="off" role="combobox"
               aria-autocomplete="list" aria-expanded="false" placeholder="Ketik nama daerah…">
+            <div class="combo-pop" hidden></div>
+          </div>
+        </div>
+        <div style="flex:1.2;display:none" id="kolNamaTg">
+          <div class="lbl-row"><label class="fl" for="tgNama">Nama penanggap <span class="opsional">· opsional</span></label></div>
+          <div class="combo">
+            <input class="field" id="tgNama" autocomplete="off" role="combobox"
+              aria-autocomplete="list" aria-expanded="false" placeholder="Ketik nama peserta…">
             <div class="combo-pop" hidden></div>
           </div>
         </div>
@@ -3575,8 +3593,74 @@ function pasangCombo(inputId){
   });
 }
 
+/* --- Siapa yang terlibat: pengangkat masalah & penanggap ---------------
+   Identitas orang diambil dari daftar peserta (tab Peserta di Liga) saat
+   dipilih, dan disalin ke catatan masalah/tanggapan ({pid, orang}) supaya
+   tetap terbawa ketika berkas sesi dibuka di laptop lain yang daftarnya kosong.
+   Bila peserta masih ada di daftar, yang tampil adalah data terkininya
+   (koreksi ejaan ikut). Jabatan = kolom tambahan yang judulnya memuat "jabatan". */
+function jabatanPeserta(p){
+  const k = Object.keys(p.extra || {}).find(n => /jabat|posisi/i.test(n));
+  return k ? String(p.extra[k] || '').trim() : '';
+}
+function snapshotOrang(pid){
+  const p = pid ? pesertaById(pid) : null;
+  return p ? {nama:p.nama, jabatan:jabatanPeserta(p), unit:String(p.unit || '').trim()} : null;
+}
+/** Orang di balik satu catatan {pid, orang}; null bila tidak tercatat. */
+function orangDari(rec){
+  if(!rec) return null;
+  return snapshotOrang(rec.pid) || (rec.orang && rec.orang.nama ? rec.orang : null);
+}
+/** Pengangkat masalah: pilihan di form, atau pemilik masalah yang ditetapkan di Liga. */
+function pengangkatMasalah(m){
+  const sendiri = orangDari(m);
+  if(sendiri) return sendiri;
+  const p = (typeof putaranUntuk === 'function') ? putaranUntuk(m.id) : null;
+  return p && p.pemilikId ? snapshotOrang(p.pemilikId) : null;
+}
+const rincianOrang = o => o ? [o.jabatan, o.unit].filter(Boolean).join(' · ') : '';
+/** " (Budi Santoso, Kepala Bidang, Bappenda)" untuk daftar teks; kosong bila tidak ada orangnya. */
+const ketOrang = o => o ? ' (' + [o.nama, o.jabatan, o.unit].filter(Boolean).map(esc).join(', ') + ')' : '';
+
 function blokKonteks(m){
-  return `<div class="d">${esc(m.daerah)}</div><h2>${esc(m.judul)}</h2><p>${esc(m.deskripsi)}</p>`;
+  const o = pengangkatMasalah(m);
+  const oleh = o ? `<div class="orang-rinci">Diangkat oleh <b>${esc(o.nama)}</b>${rincianOrang(o) ? ' · ' + esc(rincianOrang(o)) : ''}</div>` : '';
+  return `<div class="d">${esc(m.daerah)}</div>${oleh}<h2>${esc(m.judul)}</h2><p>${esc(m.deskripsi)}</p>`;
+}
+
+/* Kolom nama (opsional) di form masalah & tanggapan. Hanya muncul bila daftar
+   peserta sudah diimpor; memilih nama otomatis mengisi daerahnya. */
+let comboOrangSiap = false;
+function siapkanKolomOrang(){
+  const adaDaftar = typeof L !== 'undefined' && L.roster.length > 0;
+  $id('barisPengangkat').style.display = adaDaftar ? '' : 'none';
+  $id('kolNamaTg').style.display = adaDaftar ? '' : 'none';
+  if(comboOrangSiap) return;
+  comboOrangSiap = true;
+  const dariDaerah = idDaerah => () => {
+    const d = kanonDaerah($id(idDaerah).value.trim());
+    if(!d) return null;
+    const list = L.roster.filter(r => samaDaerah(r.daerah, d));
+    return list.length ? {judul:'Dari ' + d, list} : null;
+  };
+  [['inPengangkat','inDaerah'], ['tgNama','tgDaerah']].forEach(([idNama, idDaerah])=>{
+    pasangComboPeserta(idNama, () => L.roster, {grupAtas: dariDaerah(idDaerah)});
+    $id(idNama).addEventListener('combo-pilih', ()=>{
+      const p = pesertaById($id(idNama).dataset.id);
+      if(p && p.daerah) $id(idDaerah).value = p.daerah;
+    });
+  });
+}
+/** Baca isian nama: {pid, orang} bila dipilih dari daftar, {} bila kosong, null bila diketik tapi tidak dipilih. */
+function bacaIsianOrang(idNama, daerah){
+  const el = $id(idNama);
+  if(!el.value.trim()) return {};
+  const p = pesertaById(el.dataset.id);
+  if(!p){ sorotiKolom(el, 'Pilih nama dari daftar saran, atau kosongkan kolom ini.'); return null; }
+  // nama dari daerah lain tidak boleh menempel ke daerah yang diketik belakangan
+  if(!samaDaerah(p.daerah, daerah)){ sorotiKolom(el, p.nama + ' berasal dari ' + p.daerah + ', bukan ' + daerah + '. Ganti nama atau daerahnya.'); return null; }
+  return {pid:p.id, orang:snapshotOrang(p.id)};
 }
 
 /* Sasaran Babak 2 — kondisi penyelesaian babak, bukan skor. Tidak memblokir
@@ -3612,7 +3696,7 @@ function renderTanggapan(){
   const m = cari(S.aktifId); if(!m) return go('dash');
   // ketikan yang belum dicatat milik masalah lain tidak boleh ikut tercatat di masalah ini
   const tgI = $id('tgIsi');
-  if(tgI.dataset.mid !== m.id){ $id('tgDaerah').value = ''; tgI.value = ''; tgI.dataset.mid = m.id; }
+  if(tgI.dataset.mid !== m.id){ $id('tgDaerah').value = ''; tgI.value = ''; tgI.dataset.mid = m.id; $id('tgNama').value = ''; $id('tgNama').dataset.id = ''; }
   document.getElementById('ctxTanggapan').innerHTML = blokKonteks(m);
   renderSasaran(m);
   renderLigaTg();   // Liga Inovasi: jendela bid / pemenang untuk masalah ini
@@ -3621,10 +3705,14 @@ function renderTanggapan(){
     ? `<div class="blok-judul">Tanggapan Forum · ${m.tanggapan.length} tanggapan<small>catatan semua yang berbicara — bidder maupun bukan</small></div>` :
     '<div class="empty">Belum ada tanggapan. Catat masukan peserta dari daerah lain di bawah ini.</div>';
   m.tanggapan.forEach((t,i)=>{
+    const o = orangDari(t);
     feed.insertAdjacentHTML('beforeend',
       `<div class="resp"><button class="del" title="Hapus tanggapan" onclick="hapusTanggapan(${i})">×</button>
-       <div class="who">${esc(t.daerah)}</div><div class="txt">${esc(t.isi)}</div></div>`);
+       <div class="who">${esc(t.daerah)}${o ? `<span class="unit">· ${esc(o.nama)}</span>` : ''}</div>
+       ${o && rincianOrang(o) ? `<div class="orang-rinci">${esc(rincianOrang(o))}</div>` : ''}
+       <div class="txt">${esc(t.isi)}</div></div>`);
   });
+  siapkanKolomOrang();
 }
 
 /* ==================================================================
@@ -3636,6 +3724,8 @@ function bukaFormMasalah(){
   document.getElementById('inDaerah').value = '';
   document.getElementById('inJudul').value  = '';
   document.getElementById('inDesk').value   = '';
+  siapkanKolomOrang();
+  $id('inPengangkat').value = ''; $id('inPengangkat').dataset.id = '';
   go('masalah');
   fokusNanti('inDaerah', 350);
 }
@@ -3650,9 +3740,10 @@ function simpanMasalah(){
   // diketik bebas tanpa memilih dari saran tidak terhitung sebagai daerah lain
   // dari "Kabupaten Bandung" di statistik, Jaring Forum, dan rekap.
   const daerah = kanonDaerah(daerahMentah);
+  const orang = bacaIsianOrang('inPengangkat', daerah); if(!orang) return;
   const m = {
     id: 'm' + Date.now().toString(36),
-    daerah, judul, deskripsi: desk,
+    daerah, judul, deskripsi: desk, ...orang,
     status: 'tanggap', tanggapan: [], kesimpulan: '',
     waktu: new Date().toISOString()
   };
@@ -3669,11 +3760,17 @@ function tambahTanggapan(){
   if(!d.value.trim()){ sorotiKolom(d, 'Daerah penanggap belum diisi.'); return; }
   if(!i.value.trim()){ sorotiKolom(i, 'Isi tanggapan belum diisi.'); return; }
   const nama = kanonDaerah(d.value.trim());
+  let orang = bacaIsianOrang('tgNama', nama); if(!orang) return;
+  // giliran bicara Liga sedang berjalan: penanggapnya pasti si bidder, tak perlu dipilih lagi
+  if(!orang.pid && ligaGiliran){
+    const p = putaranUntuk(S.aktifId), b = p && p.bids.find(x => x.id === ligaGiliran), pe = b && pesertaById(b.pesertaId);
+    if(pe && samaDaerah(pe.daerah, nama)) orang = {pid:pe.id, orang:snapshotOrang(pe.id)};
+  }
   const baru = !semuaDaerah().has(nama);   // cek SEBELUM ditambahkan
-  m.tanggapan.push({daerah:nama, isi:i.value.trim()});
+  m.tanggapan.push({daerah:nama, isi:i.value.trim(), ...orang});
   simpan();
   ligaTautTanggapan(nama, i.value.trim());   // relasikan ke bid yang sedang giliran bicara
-  d.value = ''; i.value = '';
+  d.value = ''; i.value = ''; $id('tgNama').value = ''; $id('tgNama').dataset.id = '';
   renderTanggapan(); renderPanel('tanggapan');
   if(baru && !daerahStandar(nama)) toast('"' + nama + '" tidak dikenali sebagai nama wilayah resmi — tulis lengkap (mis. Kota/Kabupaten ...) supaya tidak terhitung dobel.');
   else if(baru) toast(nama + ' bergabung ke forum.');
@@ -3713,7 +3810,7 @@ function masukModeWI(){
   const brief = document.getElementById('briefWI');
   brief.innerHTML = '<div class="bh">Bahan pertimbangan — tanggapan yang masuk</div>' +
     (m.tanggapan.length
-      ? '<ol>' + m.tanggapan.map(t=>`<li><b>${esc(t.daerah)}</b> — ${esc(t.isi)}</li>`).join('') + '</ol>'
+      ? '<ol>' + m.tanggapan.map(t=>`<li><b>${esc(t.daerah)}</b>${ketOrang(orangDari(t))} — ${esc(t.isi)}</li>`).join('') + '</ol>'
       : '<div class="empty">Tidak ada tanggapan tercatat.</div>');
   document.getElementById('wiKesimpulan').value = m.kesimpulan || '';
   go('wi');
@@ -3913,10 +4010,11 @@ function lihatDetail(id){
   const m = cari(id); if(!m) return;
   document.getElementById('modalBody').innerHTML = `
     <div class="d" style="font-size:13px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)">${esc(m.daerah)}</div>
+    ${(o => o ? `<div class="orang-rinci" style="margin-top:6px">Diangkat oleh <b>${esc(o.nama)}</b>${rincianOrang(o) ? ' · ' + esc(rincianOrang(o)) : ''}</div>` : '')(pengangkatMasalah(m))}
     <h2 style="font-size:30px;letter-spacing:-.03em;margin:8px 0 14px">${esc(m.judul)}</h2>
     <p style="color:var(--text-dim);font-size:17px;line-height:1.6;white-space:pre-wrap">${esc(m.deskripsi)}</p>
     <div class="rk-lbl">Tanggapan antar-daerah</div>
-    ${m.tanggapan.length ? '<ul class="rk-list">'+m.tanggapan.map(t=>`<li><b>${esc(t.daerah)}</b> — ${esc(t.isi)}</li>`).join('')+'</ul>'
+    ${m.tanggapan.length ? '<ul class="rk-list">'+m.tanggapan.map(t=>`<li><b>${esc(t.daerah)}</b>${ketOrang(orangDari(t))} — ${esc(t.isi)}</li>`).join('')+'</ul>'
       : '<div class="empty">Belum ada tanggapan.</div>'}
     <div class="rk-lbl">Kesimpulan Forum</div>
     ${kesimpulanFinal(m) ? `<div class="rk-concl">${esc(kesimpulanFinal(m))}</div>` : '<div class="empty">Belum disimpulkan.</div>'}
@@ -4004,9 +4102,10 @@ function renderRekap(){
     const isi = list.map(m=>`
       <div class="rk-block">
         <h4>${esc(m.judul)}</h4>
+        ${(o => o ? `<div class="orang-rinci" style="margin-bottom:6px">Diangkat oleh <b>${esc(o.nama)}</b>${rincianOrang(o) ? ' · ' + esc(rincianOrang(o)) : ''}</div>` : '')(pengangkatMasalah(m))}
         <div class="desc">${esc(m.deskripsi) || '<i>tanpa uraian</i>'}</div>
         <div class="rk-lbl">Tanggapan dan pembanding antar-daerah</div>
-        ${m.tanggapan.length ? '<ul class="rk-list">'+m.tanggapan.map(t=>`<li><b>${esc(t.daerah)}</b> — ${esc(t.isi)}</li>`).join('')+'</ul>'
+        ${m.tanggapan.length ? '<ul class="rk-list">'+m.tanggapan.map(t=>`<li><b>${esc(t.daerah)}</b>${ketOrang(orangDari(t))} — ${esc(t.isi)}</li>`).join('')+'</ul>'
           : '<div class="empty">Belum ada tanggapan.</div>'}
         <div class="rk-lbl">Kesimpulan Forum</div>
         ${kesimpulanFinal(m) ? `<div class="rk-concl">${esc(kesimpulanFinal(m))}</div>` : '<div class="empty">Belum disimpulkan.</div>'}
@@ -4189,19 +4288,33 @@ function opsiTerpilih(m){
         hasil.indeks.add(i); isi.push(t.isi);
       }
     });
-    hasil.pilihan.push({nama:pe.nama, daerah:pe.daerah, isi: isi.length ? isi : [b.keypoint], dariKeypoint: !isi.length});
+    hasil.pilihan.push({nama:pe.nama, daerah:pe.daerah, rinci:rincianOrang(snapshotOrang(pid)),
+      isi: isi.length ? isi : [b.keypoint], dariKeypoint: !isi.length});
   });
   return hasil;
 }
 
-/** Daftar tanggapan bernomor: "1. Daerah — isi", baris lanjutan menjorok rapi. */
+const teksOrangPDF = o => o ? [o.nama, o.jabatan, o.unit].filter(Boolean).join(' · ') : '';
+
+/** Daftar tanggapan bernomor: "1. Daerah — isi", baris lanjutan menjorok rapi.
+    Bila penanggapnya tercatat, namanya (+ jabatan, unit) menyusul di baris sendiri sebelum isi. */
 function daftarTanggapan(ctx, list, warnaKepala){
   const {doc, W} = ctx;
   list.forEach((t,i)=>{
-    ruang(ctx, 8);
+    const o = orangDari(t);
+    ruang(ctx, o ? 22 : 8);   // kepala, nama, dan baris pertama isi tidak boleh terpisah halaman
     doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(...warnaKepala);
     const kepala = (i+1) + '. ' + t.daerah;
     doc.text(kepala, PDF.M + 2, ctx.y);
+    if(o){
+      ctx.y += 5.2;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9.6); doc.setTextColor(...PDF.grey);
+      doc.splitTextToSize(teksOrangPDF(o), W - PDF.M*2 - 8).forEach(b => { ruang(ctx, 5); doc.text(b, PDF.M + 8, ctx.y); ctx.y += 4.8; });
+      doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(...PDF.navy);
+      doc.splitTextToSize(t.isi, W - PDF.M*2 - 8).forEach(b => { ruang(ctx, 5.2); doc.text(b, PDF.M + 8, ctx.y); ctx.y += 5.2; });
+      ctx.y += 1.4;
+      return;
+    }
     const off = doc.getTextWidth(kepala) + 3;
     // isi tanggapan: baris pertama menyambung nama daerah, sisanya menjorok rapi
     doc.setFont('helvetica','normal'); doc.setTextColor(...PDF.navy);
@@ -4267,6 +4380,13 @@ function blokMasalah(ctx, m, nomor){
   doc.setFont('helvetica','bold'); doc.setFontSize(8.6); doc.setTextColor(...PDF.acc);
   doc.text('MASALAH ' + nomor + ' — ' + m.daerah.toUpperCase(), PDF.M, ctx.y, {charSpace:0.5});
   ctx.y += 7.5;
+  const pengangkat = pengangkatMasalah(m);
+  if(pengangkat){
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.8); doc.setTextColor(...PDF.grey);
+    const baris = doc.splitTextToSize('Diangkat oleh ' + teksOrangPDF(pengangkat), W - PDF.M*2);
+    baris.forEach(b => { ruang(ctx, 5); doc.text(b, PDF.M, ctx.y); ctx.y += 4.8; });
+    ctx.y += 1.2;
+  }
   paragraf(ctx, m.judul, {size:14.5, style:'bold', lh:6.6, after:2});
   paragraf(ctx, m.deskripsi || '(tanpa uraian tambahan)', {color:PDF.grey, after:4});
 
@@ -4277,6 +4397,7 @@ function blokMasalah(ctx, m, nomor){
     const baris = [];
     pilihan.forEach((o,k)=>{
       baris.push({teks:'» ' + o.daerah + ' — ' + o.nama, tebal:true});
+      if(o.rinci) baris.push({teks:o.rinci, menjorok:4});
       o.isi.forEach(t => baris.push({teks:(o.dariKeypoint ? 'Pokok jawaban: ' : '') + t, menjorok:4}));
       if(k < pilihan.length - 1) baris.push({teks:'', jarak:true});
     });
@@ -4750,9 +4871,11 @@ function pasangComboPeserta(id, daftar, opsi){
   const input = $id(id); if(!input) return;
   const pop = input.parentNode.querySelector('.combo-pop');
   let hasil = [], aktif = -1;
+  // daftar & grupAtas boleh berupa fungsi, untuk kolom tetap yang isinya berubah (roster, daerah yang sedang diketik)
+  const ambil = () => typeof daftar === 'function' ? daftar() : daftar;
   const label = p => p.nama + ' — ' + p.daerah;
   const setPilih = p => { input.dataset.id = p ? p.id : ''; input.value = p ? (p.id === '-' ? p.nama : label(p)) : ''; };
-  if(o.pra) setPilih(daftar.find(p => p.id === o.pra));
+  if(o.pra) setPilih(ambil().find(p => p.id === o.pra));
 
   function cari(q){
     const skor = p => {
@@ -4763,7 +4886,7 @@ function pasangComboPeserta(id, daftar, opsi){
       if(d.includes(q)) return 3;
       return 9;
     };
-    return daftar.map(p => [skor(p), p]).filter(x => x[0] < 9)
+    return ambil().map(p => [skor(p), p]).filter(x => x[0] < 9)
       .sort((a,b)=> a[0]-b[0] || a[1].nama.localeCompare(b[1].nama,'id')).map(x => x[1]);
   }
   function tampil(){
@@ -4771,9 +4894,10 @@ function pasangComboPeserta(id, daftar, opsi){
     let html = '';
     hasil = [];
     if(q.length < MIN_CARI){
-      if(o.grupAtas && o.grupAtas.list.length){
-        hasil = o.grupAtas.list.slice();
-        html += `<div class="combo-grp">${esc(o.grupAtas.judul)}</div>`;
+      const ga = typeof o.grupAtas === 'function' ? o.grupAtas() : o.grupAtas;
+      if(ga && ga.list.length){
+        hasil = ga.list.slice();
+        html += `<div class="combo-grp">${esc(ga.judul)}</div>`;
       }
       hasil.forEach((p,i)=>{ html += `<div class="combo-opt" data-i="${i}"><span class="cn">${esc(p.nama)}</span><span class="cp">${esc(p.daerah)}</span></div>`; });
       html += `<div class="combo-empty">Ketik minimal ${MIN_CARI} huruf nama atau daerah.</div>`;
