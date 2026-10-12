@@ -1369,9 +1369,12 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
     <div class="data-bar">
       <span class="db-lbl">Data Sesi</span>
       <span class="db-status" id="dbStatus">Tersimpan di browser ini saja</span>
-      <button class="btn btn-ghost" id="btnSambung" onclick="sambungkanBerkas()">Simpan Otomatis</button>
-      <button class="btn btn-ghost" onclick="unduhSesi()">⤓ Simpan ke Berkas</button>
-      <button class="btn btn-ghost" onclick="muatBerkasSesi()">⤒ Muat dari Berkas</button>
+      <button class="btn btn-ghost" id="btnSambung" onclick="sambungkanBerkas()"
+        title="Pilih satu berkas di laptop ini, lalu setiap perubahan langsung ikut tersimpan ke sana. Tak perlu ingat menyimpan.">Simpan Otomatis</button>
+      <button class="btn btn-ghost" onclick="unduhSesi()"
+        title="Unduh seluruh data sesi jadi satu berkas, sekali ini saja. Cocok untuk cadangan atau dibawa ke laptop lain.">⤓ Simpan ke Berkas</button>
+      <button class="btn btn-ghost" onclick="muatBerkasSesi()"
+        title="Buka berkas sesi yang pernah disimpan. Hati-hati: data di layar akan diganti dengan isi berkas itu.">⤒ Muat dari Berkas</button>
       <input type="file" id="berkasMasuk" accept="application/json,.json" style="display:none">
     </div>
   </section>
@@ -1911,9 +1914,11 @@ function statusBerkas(keadaan){
     el.className = 'db-status';
     el.innerHTML = 'Tersimpan di browser ini saja — <b>tidak terbawa</b> ke laptop lain';
     tb.textContent = 'Simpan Otomatis';
+    tb.title = 'Pilih satu berkas di laptop ini, lalu setiap perubahan langsung ikut tersimpan ke sana. Tak perlu ingat menyimpan.';
     return;
   }
   tb.textContent = 'Berhenti Simpan Otomatis';
+  tb.title = 'Putuskan sambungan ke berkas. Data tetap aman di browser ini, hanya tidak lagi disalin ke berkas.';
   if(keadaan === 'izin'){
     el.className = 'db-status';
     el.innerHTML = 'Perlu izin ulang untuk <b>' + esc(berkasHandle.name) + '</b> — klik Simpan Otomatis';
