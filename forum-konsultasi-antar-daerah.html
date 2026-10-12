@@ -184,6 +184,7 @@ input,textarea,select{font-family:inherit;color:inherit}
 .btn:active{transform:scale(.96)}
 .btn-primary{background:var(--accent);color:var(--on-accent);border-color:transparent;box-shadow:0 1px 2px rgba(0,0,0,.16)}
 .btn-kirim{background:#34C759;color:#fff;border-color:transparent;box-shadow:0 1px 2px rgba(0,0,0,.16);gap:8px}.btn-kirim:hover{background:#2DB04F}.btn-kirim .kirim-ik{font-size:1.15em;line-height:1;font-weight:700}
+.kirim-ok{color:#248A3D;font-weight:600;opacity:0;transition:opacity .25s}.kirim-ok.on{opacity:1}
 .btn-wi{background:var(--accent-2);color:var(--on-accent-2);border-color:transparent;box-shadow:0 1px 2px rgba(0,0,0,.16)}
 .btn-lg{padding:18px 34px;font-size:19px;border-radius:980px}
 .btn-ghost{background:transparent}
@@ -4666,7 +4667,8 @@ function tambahBidManual(){
   simpanLiga();
   toast((ada ? 'Keypoint diperbarui: ' : 'Bid dicatat: ') + namaPeserta(pid));
   sel.value = ''; sel.dataset.id = ''; kp.value = '';
-  renderDaftarBid(); sel.focus();
+  renderDaftarBid();
+  const ok = $id('lgBidOk'); if(ok){ ok.textContent = '✓ ' + (ada ? 'Keypoint diperbarui: ' : 'Bid tercatat: ') + namaPeserta(pid); ok.classList.add('on'); clearTimeout(ok._t); ok._t = setTimeout(()=>ok.classList.remove('on'), 4000); }
 }
 
 function hapusBid(bid){
@@ -4858,6 +4860,7 @@ function renderLigaTg(){
           <textarea class="field" id="lgBidKp" rows="2" style="margin-top:10px;min-height:56px"
             placeholder="Keypoint jawaban — ringkasan poin yang mewakili jawaban. Ctrl+Enter untuk mencatat."></textarea>
           <div class="lg-bar" style="margin-top:10px;justify-content:flex-end">
+            <span id="lgBidOk" class="kirim-ok"></span>
             <button class="btn btn-kirim" onclick="tambahBidManual()" title="Simpan bid">Catat Bid <span class="kirim-ik">↵</span></button>
           </div>
         </div>
