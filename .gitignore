@@ -25,3 +25,6 @@ cadangan-sebelum-update/
 # Identitas laptop & alamat folder ORBIT-Bersama (ingatan koreksi dikte bersama) - milik tiap laptop
 .id-laptop
 .folder-bersama
+
+# Folder ingatan koreksi dikte yang dibagikan lewat OneDrive - bukan bagian aplikasi
+ORBIT-Bersama/

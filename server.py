@@ -224,6 +224,12 @@ def cari_folder_bersama(paksa=False):
     BERSAMA['dicari'] = time.time()
     BERSAMA['folder'] = None
 
+    # folder di samping aplikasi (ORBIT-Bersama di dalam folder ORBIT) didahulukan
+    for dekat in (os.path.join(AKAR, NAMA_FOLDER_BERSAMA), os.path.join(os.path.dirname(AKAR), NAMA_FOLDER_BERSAMA)):
+        if os.path.isdir(dekat):
+            BERSAMA['folder'] = dekat
+            return dekat
+
     pangkal = []
     for kunci in ('OneDriveCommercial', 'OneDrive', 'OneDriveConsumer'):
         p = os.environ.get(kunci)
