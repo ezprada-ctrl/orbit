@@ -243,6 +243,10 @@ Di bawah kolom akan muncul baris kecil:
   memang benar (tidak akan ditandai lagi).
 - **`Diingat: … → …`** — Anda baru saja membetulkan satu kata dengan tangan.
   Aplikasi mengingatnya, jadi lain kali kesalahan yang sama dibetulkan sendiri.
+- **`Kosakata baru: …`** — Anda menulis sendiri kata yang belum dikenal (misalnya
+  nama aplikasi daerah). Kata itu langsung masuk kosakata: tidak ditandai lagi
+  dan boleh dipakai sebagai pengganti. Kata yang hanya beda satu-dua huruf dari
+  kata yang sudah dikenal dianggap salah ketik dan **tidak** diingat.
 
 Yang **tidak pernah** diubah: angka, kata pendek, singkatan berhuruf besar, dan
 nama diri (berhuruf besar di tengah kalimat). Makin sering dipakai, makin tepat.
