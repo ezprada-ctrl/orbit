@@ -880,6 +880,15 @@ body.mode-standar #panel{display:none!important}
 .set-bersama .kecil{font-size:13px;color:var(--text-dim);word-break:break-all}
 .set-bersama summary{cursor:pointer;margin-top:4px}
 .set-aksi{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+#setIngatan .field{margin-top:10px}
+.ing-list{list-style:none;margin:10px 0 0;padding:0;max-height:260px;overflow:auto;
+  border:1px solid var(--line);border-radius:var(--radius-sm)}
+.ing-list li{display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid var(--line)}
+.ing-list li:last-child{border-bottom:none}
+.ing-j{font-size:11.5px;color:var(--text-dim);min-width:78px}
+.ing-t{flex:1;word-break:break-word}
+.ing-list .kk-x{background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;padding:0 6px}
+.ing-list .kk-x:hover{color:var(--danger)}
 .set-aksi .field{flex:1;min-width:200px;width:auto}
 .set-opsi button{text-align:left;padding:18px 20px;border-radius:var(--radius-sm);
   border:1.5px solid var(--line);background:var(--surface);color:var(--text);font:inherit;cursor:pointer}
@@ -2781,11 +2790,11 @@ tinggi rendah naik turun luas sempit
    bukti konteks sejak hari pertama, sebelum ORBIT punya catatan sendiri. */
 const FRASA_DOMAIN = `pajak daerah|retribusi daerah|wajib pajak|wajib retribusi|objek pajak|subjek pajak|nilai jual|jual objek|pendapatan asli|asli daerah|pendapatan daerah|tunggakan pajak|piutang pajak|kendaraan bermotor|pajak kendaraan|balik nama|bahan bakar|pajak restoran|pajak hotel|pajak hiburan|pajak parkir|pajak reklame|pajak air|air tanah|air permukaan|sarang burung|burung walet|mineral bukan|bukan logam|logam dan|dan batuan|penerangan jalan|tenaga listrik|bea perolehan|perolehan hak|hak atas|atas tanah|tanah dan|dan bangunan|pemerintah daerah|pemerintah pusat|kepala daerah|peraturan daerah|badan pendapatan|target pendapatan|realisasi pendapatan|realisasi penerimaan|basis data|data wajib|tindak lanjut|praktik baik|jemput bola|mobil keliling|surat ketetapan|surat tagihan|surat pemberitahuan|tanda terima|nomor objek|zona nilai|nilai tanah|penilaian objek|pemutakhiran data|pendataan ulang|sanksi administrasi|pengurangan pokok|penghapusan sanksi|bagi hasil|dana bagi|dana alokasi|alokasi umum|alokasi khusus|transfer ke|tahun anggaran|tahun lalu|tahun ini|bulan ini|kami di|di daerah|daerah kami|tempat kami|kabupaten kami|kota kami`.split('|');
 
-let KK = {ganti:{}, konteks:{}, kenal:{}, tolak:{}, kosa:{}};
+let KK = {ganti:{}, konteks:{}, kenal:{}, tolak:{}, kosa:{}, kosaHapus:{}};
 function muatKK(){
   try{
     const r = JSON.parse(localStorage.getItem(KK_KEY));
-    if(r && typeof r === 'object') KK = Object.assign({ganti:{}, konteks:{}, kenal:{}, tolak:{}, kosa:{}}, r);
+    if(r && typeof r === 'object') KK = Object.assign({ganti:{}, konteks:{}, kenal:{}, tolak:{}, kosa:{}, kosaHapus:{}}, r);
   }catch(e){}
 }
 function simpanKK(){
@@ -2814,7 +2823,7 @@ try{ const r = JSON.parse(localStorage.getItem(KK_LAIN_KEY)); if(Array.isArray(r
 let kkBersama = {tersambung: false, cek: false};
 
 function gabungKK(daftar){
-  const ef = {ganti:{}, konteks:{}, kenal:{}, tolak:{}, kosa:{}};
+  const ef = {ganti:{}, konteks:{}, kenal:{}, tolak:{}, kosa:{}, kosaHapus:{}};
   const suara = {ganti:{}, konteks:{}};
   daftar.forEach(k => {
     if(!k) return;
@@ -2826,6 +2835,7 @@ function gabungKK(daftar){
       x.t = Math.max(x.t, g.t || 0);
     }));
     Object.entries(k.kosa || {}).forEach(([w, t]) => { ef.kosa[w] = Math.max(ef.kosa[w] || 0, +t || 1); });
+    Object.entries(k.kosaHapus || {}).forEach(([w, t]) => { ef.kosaHapus[w] = Math.max(ef.kosaHapus[w] || 0, +t || 1); });
     Object.entries(k.kenal || {}).forEach(([w, t]) => { ef.kenal[w] = Math.max(ef.kenal[w] || 0, +t || 1); });
     Object.entries(k.tolak || {}).forEach(([p, t]) => { ef.tolak[p] = Math.max(ef.tolak[p] || 0, +t || 1); });
   });
@@ -2839,6 +2849,8 @@ function gabungKK(daftar){
     });
     if(hidup.length) ef[j][a] = hidup.sort((p, q) => q.n - p.n || q.t - p.t)[0];
   }));
+  // kosakata yang dihapus dari Daftar Ingatan, kecuali diketik ulang sesudahnya
+  Object.keys(ef.kosa).forEach(w => { if((ef.kosaHapus[w] || 0) >= ef.kosa[w]) delete ef.kosa[w]; });
   return ef;
 }
 function hitungKKe(){ KKe = gabungKK([KK].concat(KK_LAIN)); kkCache = null; }
@@ -3152,7 +3164,7 @@ function belajarDariSuntingan(lama, baru){
   const baruKosa = [];
   if(B.length && B.length <= 12) B.forEach(w0 => {
     const w = w0.toLowerCase();
-    if(w.length < 4 || /\d/.test(w) || kataDikenal(w, v) || KK.kosa[w]) return;
+    if(w.length < 4 || /\d/.test(w) || kataDikenal(w, v) || KKe.kosa[w]) return;
     // singkatan berhuruf kapital semua (SIMPADA) hampir pasti disengaja, bukan salah ketik
     if(w0 !== w0.toUpperCase() && calonPengganti(w, v).size) return;
     KK.kosa[w] = Date.now();
@@ -6392,9 +6404,13 @@ function bukaSetelan(){
       dibekukan dan bisa dilanjutkan saat kembali.</p>
     <div class="rk-lbl">Ingatan Koreksi Dikte · Bersama</div>
     <div id="setBersama" class="set-bersama">Memeriksa…</div>
+    <details class="set-bersama"><summary><b>Daftar Ingatan</b> — lihat &amp; hapus yang keliru</summary>
+      <div id="setIngatan"></div></details>
     <div style="display:flex;margin-top:18px"><button class="btn btn-ghost" style="margin-left:auto" onclick="tutupModal()">Tutup</button></div>`;
   $id('overlay').classList.add('on');
-  sinkronKKBersama().then(tampilSetBersama);
+  cariIngatan = '';
+  tampilDaftarIngatan();
+  sinkronKKBersama().then(() => { tampilSetBersama(); tampilDaftarIngatan(); });
 }
 
 /* Status berbagi ingatan koreksi, dalam bahasa PTP: tersambung atau belum,
@@ -6433,6 +6449,49 @@ function tampilSetBersama(){
       <button class="btn btn-ghost" onclick="aturFolderBersama($id('setFolderBersama').value)">Pakai</button></div>
     </details>`;
 }
+/* DAFTAR INGATAN — semua yang sedang dipakai ORBIT (gabungan semua laptop),
+   bisa dihapus satu per satu. Hapus = penanda waktu yang ikut menyebar,
+   jadi laptop lain ikut melupakannya. Diajarkan ulang sesudahnya -> hidup lagi. */
+let cariIngatan = '';
+function daftarIngatan(){
+  const d = [];
+  Object.entries(KKe.ganti).forEach(([a, g]) => d.push({jenis: 'ganti', kunci: a, kata: a, teks: a + ' → ' + g.ke, ke: g.ke}));
+  Object.entries(KKe.konteks).forEach(([k, g]) => d.push({jenis: 'konteks', kunci: k, kata: k.split(' ').pop(),
+    teks: k + ' → ' + k.split(' ').slice(0, -1).join(' ') + ' ' + g.ke, ke: g.ke}));
+  Object.keys(KKe.kosa).forEach(w => d.push({jenis: 'kosa', kunci: w, kata: w, teks: w}));
+  return d.sort((x, y) => x.teks.localeCompare(y.teks));
+}
+function tampilDaftarIngatan(){
+  const el = $id('setIngatan');
+  if(!el) return;
+  const q = cariIngatan.toLowerCase();
+  const semua = daftarIngatan(), d = semua.filter(x => !q || x.teks.toLowerCase().includes(q));
+  const baris = d.slice(0, 200).map(x => `<li><span class="ing-j">${x.jenis === 'kosa' ? 'Kosakata' : 'Pembetulan'}</span>
+      <span class="ing-t">${esc(x.teks)}</span>
+      <button class="kk-x" title="Hapus dari ingatan semua laptop" onclick="hapusIngatan('${x.jenis}','${esc(x.kunci).replace(/'/g, '&#39;')}')">×</button></li>`).join('');
+  el.innerHTML = `<input class="field" placeholder="Cari kata…" value="${esc(cariIngatan)}"
+      oninput="cariIngatan=this.value;tampilDaftarIngatan();const i=$id('setIngatan').querySelector('input');i.focus();i.setSelectionRange(i.value.length,i.value.length)">
+    ${semua.length ? `<ul class="ing-list">${baris || '<li class="kecil">Tidak ada yang cocok.</li>'}</ul>`
+                   : '<p class="kecil">Belum ada yang diingat. Ingatan bertambah setiap PTP membetulkan kata hasil dikte.</p>'}
+    ${d.length > 200 ? `<p class="kecil">Menampilkan 200 dari ${d.length} — persempit dengan kolom cari.</p>` : ''}`;
+}
+function hapusIngatan(jenis, kunci){
+  const t = Date.now();
+  if(jenis === 'kosa'){
+    KK.kosaHapus[kunci] = t;
+    delete KK.kosa[kunci];
+  }else{
+    const g = (jenis === 'ganti' ? KKe.ganti : KKe.konteks)[kunci];
+    if(!g) return;
+    const kata = jenis === 'ganti' ? kunci : kunci.split(' ').pop();
+    KK.tolak[kata + '>' + g.ke.toLowerCase()] = t;
+    delete KK[jenis][kunci];
+  }
+  simpanKK();
+  tampilDaftarIngatan();
+  toast('Dihapus dari ingatan' + (kkBersama.tersambung ? ' semua laptop.' : ' laptop ini.'));
+}
+
 async function cariLagiBersama(btn){
   btn.disabled = true; btn.textContent = 'Mencari…';
   await sinkronKKBersama(true);
