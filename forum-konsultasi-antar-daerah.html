@@ -6453,6 +6453,32 @@ function tampilSetBersama(){
    bisa dihapus satu per satu. Hapus = penanda waktu yang ikut menyebar,
    jadi laptop lain ikut melupakannya. Diajarkan ulang sesudahnya -> hidup lagi. */
 let cariIngatan = '';
+/* Hanya koordinator yang boleh menghapus. Yang disimpan sidik jari SHA-256,
+   bukan sandinya — berkas ini publik di GitHub. Ini kunci ringan untuk
+   mencegah salah hapus oleh PTP, bukan pengaman data rahasia. Kunci terbuka
+   selama tab browser ini terbuka saja. */
+const SANDI_INGATAN = '1ea4ee6404b8477d9bcdbbd01c27312b394d198b858110679cf6d8f1513ad024';
+let ingatanTerbuka = false;
+try{ ingatanTerbuka = sessionStorage.getItem('orbit-ingatan-terbuka') === '1'; }catch(e){}
+async function bukaKunciIngatan(){
+  const el = $id('sandiIngatan');
+  const isi = el ? el.value : '';
+  let cocok = false;
+  try{
+    const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(isi));
+    cocok = [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('') === SANDI_INGATAN;
+  }catch(e){}
+  if(!cocok){ toast('Kata sandi salah.'); if(el){ el.value = ''; el.focus(); } return; }
+  ingatanTerbuka = true;
+  try{ sessionStorage.setItem('orbit-ingatan-terbuka', '1'); }catch(e){}
+  tampilDaftarIngatan();
+  toast('Kunci terbuka — Anda bisa menghapus ingatan.');
+}
+function kunciIngatan(){
+  ingatanTerbuka = false;
+  try{ sessionStorage.removeItem('orbit-ingatan-terbuka'); }catch(e){}
+  tampilDaftarIngatan();
+}
 function daftarIngatan(){
   const d = [];
   Object.entries(KKe.ganti).forEach(([a, g]) => d.push({jenis: 'ganti', kunci: a, kata: a, teks: a + ' → ' + g.ke, ke: g.ke}));
@@ -6468,14 +6494,21 @@ function tampilDaftarIngatan(){
   const semua = daftarIngatan(), d = semua.filter(x => !q || x.teks.toLowerCase().includes(q));
   const baris = d.slice(0, 200).map(x => `<li><span class="ing-j">${x.jenis === 'kosa' ? 'Kosakata' : 'Pembetulan'}</span>
       <span class="ing-t">${esc(x.teks)}</span>
-      <button class="kk-x" title="Hapus dari ingatan semua laptop" onclick="hapusIngatan('${x.jenis}','${esc(x.kunci).replace(/'/g, '&#39;')}')">×</button></li>`).join('');
-  el.innerHTML = `<input class="field" placeholder="Cari kata…" value="${esc(cariIngatan)}"
+      ${ingatanTerbuka ? `<button class="kk-x" title="Hapus dari ingatan semua laptop" onclick="hapusIngatan('${x.jenis}','${esc(x.kunci).replace(/'/g, '&#39;')}')">×</button>` : ''}</li>`).join('');
+  const kunci = ingatanTerbuka
+    ? `<div class="set-aksi"><span class="kecil" style="flex:1">🔓 Mode koordinator — klik × untuk menghapus.</span>
+         <button class="btn btn-ghost" onclick="kunciIngatan()">Kunci lagi</button></div>`
+    : `<div class="set-aksi"><input id="sandiIngatan" type="password" class="field" placeholder="Kata sandi koordinator untuk menghapus"
+         onkeydown="if(event.key==='Enter')bukaKunciIngatan()">
+         <button class="btn btn-ghost" onclick="bukaKunciIngatan()">Buka kunci</button></div>`;
+  el.innerHTML = kunci + `<input class="field" placeholder="Cari kata…" value="${esc(cariIngatan)}"
       oninput="cariIngatan=this.value;tampilDaftarIngatan();const i=$id('setIngatan').querySelector('input');i.focus();i.setSelectionRange(i.value.length,i.value.length)">
     ${semua.length ? `<ul class="ing-list">${baris || '<li class="kecil">Tidak ada yang cocok.</li>'}</ul>`
                    : '<p class="kecil">Belum ada yang diingat. Ingatan bertambah setiap PTP membetulkan kata hasil dikte.</p>'}
     ${d.length > 200 ? `<p class="kecil">Menampilkan 200 dari ${d.length} — persempit dengan kolom cari.</p>` : ''}`;
 }
 function hapusIngatan(jenis, kunci){
+  if(!ingatanTerbuka){ toast('Butuh kata sandi koordinator.'); return; }
   const t = Date.now();
   if(jenis === 'kosa'){
     KK.kosaHapus[kunci] = t;

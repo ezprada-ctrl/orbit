@@ -278,8 +278,10 @@ Kalau sudah muncul **✓ Tersambung**, selesai. Sejak itu:
 
 **Daftar Ingatan.** Di Setelan, buka **Daftar Ingatan** untuk melihat semua
 pembetulan dan kosakata yang sedang dipakai (gabungan semua laptop). Ada kolom
-cari. Klik **×** untuk menghapus yang keliru — penghapusan ikut menyebar ke semua
-laptop. Kalau kata itu nanti dibetulkan/diketik lagi oleh PTP, ia diingat lagi.
+cari. Semua PTP bisa melihat daftarnya, tapi **hanya koordinator** yang bisa
+menghapus: isi kata sandi koordinator, klik **Buka kunci**, lalu klik **×** pada
+yang keliru — penghapusan ikut menyebar ke semua laptop. Kunci tertutup lagi
+saat browser ditutup, atau klik **Kunci lagi**. Kalau kata itu nanti dibetulkan/diketik lagi oleh PTP, ia diingat lagi.
 
 Kalau foldernya ditaruh di tempat lain dan tidak ketemu otomatis, buka
 **Folder ada di tempat lain?** di Setelan dan tempel alamat foldernya.
