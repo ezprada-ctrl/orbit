@@ -179,7 +179,9 @@ lain, alamatnya bisa diisi manual dari Setelan (disimpan di .folder-bersama).
 """
 NAMA_FOLDER_BERSAMA = 'ORBIT-Bersama'
 BERKAS_FOLDER_BERSAMA = os.path.join(AKAR, '.folder-bersama')   # lokal: tidak ikut zip/git
-BERKAS_ID_LAPTOP = os.path.join(AKAR, '.id-laptop')
+# Satu berkas per nama komputer: folder aplikasi yang ikut tersinkron OneDrive ke
+# laptop lain tidak membuat dua laptop memakai identitas (dan berkas) yang sama.
+BERKAS_ID_LAPTOP = os.path.join(AKAR, '.id-laptop-' + nama_berkas_aman(socket.gethostname())[:30])
 BERSAMA = {'folder': None, 'dicari': 0.0}
 
 
@@ -275,8 +277,14 @@ def status_bersama(paksa=False):
         nama_nama = os.listdir(folder)
     except OSError:
         return dict(hasil, tersambung=False)
-    for nama in nama_nama:
-        if not (nama.startswith('koreksi-') and nama.endswith('.json')) or nama == sendiri:
+    semua = [n[:-5] for n in nama_nama if n.startswith('koreksi-') and n.endswith('.json')]
+    for inti in semua:
+        nama = inti + '.json'
+        if nama == sendiri:
+            continue
+        # salinan "konflik" buatan OneDrive (koreksi-<id>-NAMAPC.json) bukan laptop lain:
+        # suara laptop aslinya tidak boleh terhitung dua kali
+        if any(inti != lain and inti.startswith((lain + '-', lain + ' ')) for lain in semua + [sendiri[:-5]]):
             continue
         p = os.path.join(folder, nama)
         try:

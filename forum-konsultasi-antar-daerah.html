@@ -2808,7 +2808,9 @@ function simpanKK(){
    Tanpa server (dibuka dari file://) atau tanpa folder bersama, ORBIT
    tetap jalan dengan ingatan laptop ini saja.
    ------------------------------------------------------------------ */
+const KK_LAIN_KEY = 'orbit-koreksi-lain-v1';   // salinan terakhir ingatan laptop lain
 let KK_LAIN = [], KKe = KK;
+try{ const r = JSON.parse(localStorage.getItem(KK_LAIN_KEY)); if(Array.isArray(r)) KK_LAIN = r; }catch(e){}
 let kkBersama = {tersambung: false, cek: false};
 
 function gabungKK(daftar){
@@ -2859,8 +2861,12 @@ async function sinkronKKBersama(cari){
     const d = await r.json();
     const baruTersambung = d.tersambung && !kkBersama.tersambung;
     kkBersama = Object.assign(d, {cek: true});
-    KK_LAIN = (d.lain || []).map(x => x.ingatan);
-    hitungKKe();
+    if(d.tersambung){
+      KK_LAIN = (d.lain || []).map(x => x.ingatan);
+      // salinan disimpan: OneDrive sempat tak terjangkau -> pelajaran laptop lain tetap terpakai
+      try{ localStorage.setItem(KK_LAIN_KEY, JSON.stringify(KK_LAIN)); }catch(e){}
+      hitungKKe();
+    }
     // pertama tersambung: ingatan laptop ini langsung ikut dibagikan
     if(baruTersambung && (Object.keys(KK.ganti).length || Object.keys(KK.konteks).length
        || Object.keys(KK.kenal).length || Object.keys(KK.tolak).length)) kirimKKBersama();
@@ -3147,7 +3153,8 @@ function belajarDariSuntingan(lama, baru){
   if(B.length && B.length <= 12) B.forEach(w0 => {
     const w = w0.toLowerCase();
     if(w.length < 4 || /\d/.test(w) || kataDikenal(w, v) || KK.kosa[w]) return;
-    if(calonPengganti(w, v).size) return;
+    // singkatan berhuruf kapital semua (SIMPADA) hampir pasti disengaja, bukan salah ketik
+    if(w0 !== w0.toUpperCase() && calonPengganti(w, v).size) return;
     KK.kosa[w] = Date.now();
     baruKosa.push(w0);
   });
@@ -3249,6 +3256,7 @@ function pasangDikte(inputId, btnId, opsi){
   kap.insertAdjacentElement('afterend', bar);
   let catatanKK = [];   // {jenis:'ganti'|'saran'|'ajar', ...}
 
+  const adaKataDi = (teks, k) => new RegExp('(^|[^' + HURUF + '])' + lolosRegex(k) + '(?![' + HURUF + '])').test(teks);
   const adaKata = k => new RegExp('(^|[^' + HURUF + '])' + lolosRegex(k) + '(?![' + HURUF + '])').test(field.value);
   function segarkanBar(){
     catatanKK = catatanKK.filter(c => c.jenis === 'ajar' ? Date.now() - c.t < 8000
@@ -3268,10 +3276,23 @@ function pasangDikte(inputId, btnId, opsi){
      dibaca. Diproses setelah PTP berhenti mengetik sebentar atau pindah
      kolom, supaya ketikan setengah jadi tidak ikut diingat. */
   let cermin = field.value, tundaAjar = null;
-  function pelajariSuntingan(){
+  // kata yang sedang disentuh kursor (mungkin masih diketik)
+  function kataDiKursor(){
+    if(document.activeElement !== field) return '';
+    const i = field.selectionStart, v = field.value;
+    const kiri = v.slice(0, i).match(new RegExp('[' + HURUF + '-]*$'))[0];
+    const kanan = v.slice(i).match(new RegExp('^[' + HURUF + '-]*'))[0];
+    return kiri + kanan;
+  }
+  function pelajariSuntingan(paksa){
     clearTimeout(tundaAjar); tundaAjar = null;
     const baru = field.value;
     if(baru === cermin) return;
+    /* Jeda mengetik saat kursor masih menempel di kata yang baru diubah:
+       mungkin kata itu belum selesai ("Sipan…"). Ditunggu sampai kursor
+       pindah, kolom ditinggalkan, atau tanggapan disimpan. */
+    const dk = paksa ? '' : kataDiKursor();
+    if(dk && !adaKataDi(cermin, dk)){ tundaAjar = setTimeout(() => pelajariSuntingan(false), 2500); return; }
     const lama = cermin;
     cermin = baru;
     // PTP mengetik balik kata asli dari pembetulan otomatis = pembetulannya ditolak
@@ -3300,15 +3321,19 @@ function pasangDikte(inputId, btnId, opsi){
   field.addEventListener('input', e => {
     if(!e.isTrusted){ cermin = field.value; segarkanBar(); return; }
     clearTimeout(tundaAjar);
-    tundaAjar = setTimeout(pelajariSuntingan, 2500);
+    tundaAjar = setTimeout(() => pelajariSuntingan(false), 2500);
   });
-  field.addEventListener('blur', () => { if(tundaAjar) pelajariSuntingan(); });
+  field.addEventListener('blur', () => { if(tundaAjar) pelajariSuntingan(true); });
+  // Ctrl+Enter menyimpan tanpa meninggalkan kolom — suntingan terakhir dibaca dulu
+  field.addEventListener('keydown', e => {
+    if(e.key === 'Enter' && (e.ctrlKey || e.metaKey) && tundaAjar) pelajariSuntingan(true);
+  }, true);
 
   bar.addEventListener('mousedown', e => e.preventDefault());   // kursor tetap di kolom
   bar.addEventListener('click', e => {
     const t = e.target.closest('button[data-k]');
     if(!t) return;
-    if(tundaAjar) pelajariSuntingan();
+    if(tundaAjar) pelajariSuntingan(true);
     const c = catatanKK[+t.dataset.k];
     if(!c) return;
     if(c.jenis === 'ganti'){
@@ -3339,7 +3364,7 @@ function pasangDikte(inputId, btnId, opsi){
         mengklik satu kata di tengah dan membetulkannya sambil dikte jalan. */
   function sisipkan(teks, conf){
     teks = koreksiIstilah(teks);
-    if(tundaAjar) pelajariSuntingan();   // suntingan PTP yang belum terbaca, baca dulu
+    if(tundaAjar) pelajariSuntingan(true);   // suntingan PTP yang belum terbaca, baca dulu
 
     /* Nama daerah hanya dipanen dari kalimat PEMBUKA — saat kolom isi masih
        kosong dan kolom daerah belum terisi. Di tengah tanggapan, penyebutan
@@ -6378,7 +6403,7 @@ function tampilSetBersama(){
   const el = $id('setBersama');
   if(!el) return;
   const b = kkBersama;
-  const jumlahIngat = Object.keys(KKe.ganti).length + Object.keys(KKe.konteks).length;
+  const jumlahIngat = Object.keys(KKe.ganti).length + Object.keys(KKe.konteks).length + Object.keys(KKe.kosa).length;
   if(location.protocol === 'file:' || b.tanpaServer){
     el.innerHTML = `<p>Berbagi ingatan hanya jalan bila ORBIT dibuka lewat <b>ORBIT-execute.bat</b>.
       Saat ini ingatan hanya tersimpan di laptop ini (${jumlahIngat} pembetulan).</p>`;
