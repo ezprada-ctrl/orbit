@@ -7280,7 +7280,7 @@ async function bukaFolderArsip(bersama){
   try{
     const d = await (await fetch('/api/transkrip/buka-folder', {method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({bersama})})).json();
-    if(!d.ok) toast(d.pesan || 'Folder tidak bisa dibuka.');
+    toast(d.ok ? 'Folder dibuka — bila belum terlihat, cek taskbar.' : (d.pesan || 'Folder tidak bisa dibuka.'));
   }catch(e){ toast('Server ORBIT tidak menjawab.'); }
 }
 

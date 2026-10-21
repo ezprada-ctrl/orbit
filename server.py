@@ -212,6 +212,39 @@ def folder_manual():
         return None
 
 
+def buka_folder_di_depan(folder):
+    """Buka folder di Explorer dan bawa ke depan. Dibuka dari proses latar,
+    Windows biasanya menaruh jendelanya di belakang browser sehingga tampak
+    seperti tombol tidak bekerja."""
+    os.startfile(folder)
+    def angkat():
+        try:
+            import ctypes
+            u = ctypes.windll.user32
+            nama = os.path.basename(os.path.normpath(folder)).lower()
+            ketemu = []
+            kelas = ctypes.create_unicode_buffer(64)
+            judul = ctypes.create_unicode_buffer(260)
+            cb_tipe = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+            def cek(h, _):
+                u.GetClassNameW(h, kelas, 64)
+                if kelas.value == 'CabinetWClass' and u.IsWindowVisible(h):
+                    u.GetWindowTextW(h, judul, 260)
+                    if judul.value.lower() == nama:
+                        ketemu.append(h)
+                return True
+            for _ in range(15):   # tunggu jendelanya muncul, maksimal ~3 detik
+                time.sleep(0.2)
+                u.EnumWindows(cb_tipe(cek), 0)
+                if ketemu: break
+            if not ketemu: return
+            u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)   # tekan Alt: izin pindah ke depan
+            u.ShowWindow(ketemu[0], 9)   # SW_RESTORE (bila terminimalkan)
+            u.SetForegroundWindow(ketemu[0])
+        except Exception:
+            pass
+    threading.Thread(target=angkat, daemon=True).start()
+
 def cari_folder_bersama(paksa=False):
     """Alamat folder ORBIT-Bersama, atau None. Pencarian dibatasi kedalaman &
     jumlah folder supaya cepat, dan hasil 'tidak ketemu' diingat 2 menit."""
@@ -800,7 +833,7 @@ class Penangan(SimpleHTTPRequestHandler):
                 return self.kirim_json({'ok': False, 'pesan': 'Folder bersama belum tersambung.'})
             try:
                 os.makedirs(folder, exist_ok=True)
-                os.startfile(folder)
+                buka_folder_di_depan(folder)
             except (OSError, AttributeError) as e:
                 return self.kirim_json({'ok': False, 'pesan': 'Folder tidak bisa dibuka: %s' % e})
             return self.kirim_json({'ok': True})
