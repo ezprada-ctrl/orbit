@@ -55,8 +55,9 @@ if exist "%~dp0server.py" (
   echo.
 )
 
-REM Buka browser 2 detik setelah server siap
-start "" /b cmd /c "timeout /t 2 /nobreak >nul & start "" http://localhost:8200/forum-konsultasi-antar-daerah.html"
+REM Buka browser 2 detik setelah server siap. Dilewati bila dinyalakan ulang lewat
+REM Ctrl+Shift+R (ORBIT_TANPA_BROWSER) — halaman yang sudah terbuka memuat ulang sendiri.
+if not defined ORBIT_TANPA_BROWSER start "" /b cmd /c "timeout /t 2 /nobreak >nul & start "" http://localhost:8200/forum-konsultasi-antar-daerah.html"
 
 echo   Aplikasi akan terbuka di browser sebentar lagi.
 echo.

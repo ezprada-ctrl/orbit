@@ -221,16 +221,20 @@ def buka_folder_di_depan(folder):
         try:
             import ctypes
             u = ctypes.windll.user32
+            k = ctypes.windll.kernel32
+            u.GetForegroundWindow.restype = ctypes.c_void_p
             nama = os.path.basename(os.path.normpath(folder)).lower()
             ketemu = []
             kelas = ctypes.create_unicode_buffer(64)
             judul = ctypes.create_unicode_buffer(260)
             cb_tipe = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
             def cek(h, _):
-                u.GetClassNameW(h, kelas, 64)
-                if kelas.value == 'CabinetWClass' and u.IsWindowVisible(h):
-                    u.GetWindowTextW(h, judul, 260)
-                    if judul.value.lower() == nama:
+                u.GetClassNameW(ctypes.c_void_p(h), kelas, 64)
+                if kelas.value == 'CabinetWClass' and u.IsWindowVisible(ctypes.c_void_p(h)):
+                    u.GetWindowTextW(ctypes.c_void_p(h), judul, 260)
+                    j = judul.value.lower()
+                    # judul Explorer: "nama-folder - File Explorer"
+                    if j == nama or j.startswith(nama + ' - '):
                         ketemu.append(h)
                 return True
             for _ in range(15):   # tunggu jendelanya muncul, maksimal ~3 detik
@@ -238,12 +242,62 @@ def buka_folder_di_depan(folder):
                 u.EnumWindows(cb_tipe(cek), 0)
                 if ketemu: break
             if not ketemu: return
-            u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)   # tekan Alt: izin pindah ke depan
-            u.ShowWindow(ketemu[0], 9)   # SW_RESTORE (bila terminimalkan)
-            u.SetForegroundWindow(ketemu[0])
+            h = ctypes.c_void_p(ketemu[0])
+            # Windows hanya mengizinkan proses yang sedang "aktif" memindahkan fokus:
+            # numpang pada utas jendela yang sedang di depan (browser) untuk sesaat.
+            depan = u.GetForegroundWindow()
+            utas_depan = u.GetWindowThreadProcessId(ctypes.c_void_p(depan), None) if depan else 0
+            utas_ini = k.GetCurrentThreadId()
+            if utas_depan and utas_depan != utas_ini:
+                u.AttachThreadInput(utas_ini, utas_depan, True)
+            u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)   # tekan Alt
+            if u.IsIconic(h): u.ShowWindow(h, 9)   # SW_RESTORE bila terminimalkan
+            u.BringWindowToTop(h)
+            u.SetForegroundWindow(h)
+            if utas_depan and utas_depan != utas_ini:
+                u.AttachThreadInput(utas_ini, utas_depan, False)
         except Exception:
             pass
     threading.Thread(target=angkat, daemon=True).start()
+
+
+def mulai_ulang_penuh():
+    """Ctrl+Shift+R: tutup jendela hitam ORBIT beserta servernya, lalu buka lagi
+    lewat ORBIT-execute.bat (termasuk cek pembaruan di sana). Dikerjakan oleh
+    PowerShell terpisah karena proses ini ikut mati. Peramban tidak dibuka
+    ulang (ORBIT_TANPA_BROWSER) — halaman yang sedang terbuka memuat ulang sendiri."""
+    import subprocess
+    time.sleep(0.5)   # beri waktu respons HTTP benar-benar terkirim
+    if TEROWONGAN['proses']:
+        try: TEROWONGAN['proses'].terminate()
+        except Exception: pass
+    bat = os.path.join(AKAR, 'ORBIT-execute.bat')
+    skrip = r'''
+$ids = @(%d); $p = %d
+for($i = 0; $i -lt 4; $i++){
+  $c = Get-CimInstance Win32_Process -Filter "ProcessId=$p"
+  if(-not $c){ break }
+  $q = Get-CimInstance Win32_Process -Filter "ProcessId=$($c.ParentProcessId)"
+  if(-not $q -or $q.Name -notin 'cmd.exe','py.exe','python.exe','pyw.exe'){ break }
+  if($q.Name -eq 'cmd.exe' -and $q.CommandLine -notmatch 'ORBIT'){ break }   # jangan menutup terminal milik orang lain
+  $ids += $q.ProcessId; $p = $q.ProcessId
+}
+Start-Sleep -Milliseconds 500
+[array]::Reverse($ids)
+foreach($i in $ids){ Stop-Process -Id $i -Force -ErrorAction SilentlyContinue }
+Start-Sleep -Seconds 1
+$env:ORBIT_TANPA_BROWSER = '1'
+Start-Process -FilePath cmd.exe -ArgumentList '/c', 'start "ORBIT" "%s"' -WorkingDirectory '%s' -WindowStyle Hidden
+''' % (os.getpid(), os.getpid(), bat.replace("'", "''"), AKAR.replace("'", "''"))
+    try:
+        import base64
+        kode = base64.b64encode(skrip.encode('utf-16-le')).decode('ascii')
+        subprocess.Popen(['powershell', '-NoProfile', '-WindowStyle', 'Hidden', '-EncodedCommand', kode],
+                         creationflags=0x08000000 | 0x00000200,   # CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP (DETACHED_PROCESS membuat PowerShell langsung keluar)
+                         close_fds=True)
+    except Exception as e:
+        print('  [!] Gagal memulai ulang otomatis: %s' % e)
+
 
 def cari_folder_bersama(paksa=False):
     """Alamat folder ORBIT-Bersama, atau None. Pencarian dibatasi kedalaman &
@@ -765,6 +819,13 @@ class Penangan(SimpleHTTPRequestHandler):
                 NILAI.clear()
                 NILAI['buka'] = False
             return self.kirim_json({'ok': True})
+
+        if jalur == '/api/mulai-ulang':
+            if os.name != 'nt':
+                return self.kirim_json({'ok': False, 'pesan': 'Mulai ulang otomatis hanya untuk Windows.'})
+            self.kirim_json({'ok': True})
+            threading.Thread(target=mulai_ulang_penuh, daemon=True).start()
+            return
 
         if jalur == '/api/update':
             if salinan_pengembang():

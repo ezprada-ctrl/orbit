@@ -4700,6 +4700,24 @@ document.addEventListener('keydown', e=>{
   }
 });
 
+// Ctrl+Shift+R = mulai ulang ORBIT penuh: jendela hitam & server ditutup lalu ORBIT-execute.bat dibuka lagi
+document.addEventListener('keydown', e=>{
+  if((e.ctrlKey||e.metaKey) && e.shiftKey && e.key.toLowerCase()==='r'){
+    e.preventDefault();
+    if(!PANGGUNG) mulaiUlangOrbit();
+  }
+});
+async function mulaiUlangOrbit(){
+  if(location.protocol === 'file:'){ toast('Mulai ulang hanya jalan bila ORBIT dibuka lewat ORBIT-execute.bat.'); return; }
+  if(!confirm('Mulai ulang ORBIT?\n\nJendela hitam akan ditutup lalu dibuka lagi otomatis, dan halaman ini ikut dimuat ulang. Catatan & data tetap aman. Jendela bid Liga yang sedang terbuka akan tertutup.')) return;
+  let hasil;
+  try{ hasil = await (await fetch('/api/mulai-ulang', {method:'POST', body:'{}'})).json(); }
+  catch(e){ tampilkanUpdateOv('Tidak bisa mulai ulang', 'Server ORBIT tidak menjawab — jalankan ORBIT-execute.bat.', true); return; }
+  if(!hasil.ok){ tampilkanUpdateOv('Tidak bisa mulai ulang', hasil.pesan || 'Terjadi kesalahan tak dikenal.', true); return; }
+  tampilkanUpdateOv('Memulai ulang ORBIT…', 'Jendela hitam ditutup dan dibuka lagi. Halaman ini akan memuat ulang sendiri.', false);
+  setTimeout(()=> tungguServerSiapLaluMuatUlang(0, 120), 3000);
+}
+
 function tampilkanUpdateOv(judul, pesan, gagal){
   document.getElementById('updateJudul').textContent = judul;
   document.getElementById('updatePesan').textContent = pesan;
@@ -4727,9 +4745,9 @@ async function mulaiUpdateOtomatis(){
   tungguServerSiapLaluMuatUlang();
 }
 
-function tungguServerSiapLaluMuatUlang(percobaan){
+function tungguServerSiapLaluMuatUlang(percobaan, maks){
   percobaan = percobaan || 0;
-  if(percobaan > 40){
+  if(percobaan > (maks || 40)){
     tampilkanUpdateOv('Server belum menyala kembali',
       'Tutup kotak ini, lalu muat ulang halaman manual (F5) sebentar lagi.', true);
     return;
@@ -4739,7 +4757,7 @@ function tungguServerSiapLaluMuatUlang(percobaan){
       const r = await fetch('/api/info', {cache:'no-store'});
       if(r.ok){ location.reload(); return; }
     }catch(e){}
-    tungguServerSiapLaluMuatUlang(percobaan+1);
+    tungguServerSiapLaluMuatUlang(percobaan+1, maks);
   }, 1000);
 }
 

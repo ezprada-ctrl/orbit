@@ -36,3 +36,9 @@ Selama aplikasi sedang terbuka di browser (lewat `ORBIT-execute.bat`), tekan
 **Ctrl+Shift+U**. Aplikasi menarik versi terbaru, memasangnya, menyalakan
 ulang server sendiri, lalu memuat ulang halaman — tanpa perlu keluar dari
 aplikasi atau menyentuh folder sama sekali.
+
+### Mulai ulang penuh (Ctrl+Shift+R)
+
+Tekan **Ctrl+Shift+R** di aplikasi untuk menutup jendela hitam ORBIT beserta
+servernya, lalu membuka `ORBIT-execute.bat` lagi (termasuk cek pembaruan) dan
+memuat ulang halaman — tanpa menutup/membuka jendela hitam secara manual.
