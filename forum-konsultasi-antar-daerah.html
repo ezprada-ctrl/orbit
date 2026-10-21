@@ -6417,7 +6417,7 @@ function bukaSetelan(){
     <div id="setArsip" class="set-bersama">Memeriksa…</div>
     <div class="rk-lbl">Ingatan Koreksi Dikte · Bersama</div>
     <div id="setBersama" class="set-bersama">Memeriksa…</div>
-    <details class="set-bersama"><summary><b>Daftar Ingatan</b> — lihat &amp; hapus yang keliru</summary>
+    <details class="set-bersama"><summary title="Daftar kata yang sudah dibetulkan ORBIT otomatis saat dikte. Buka untuk melihatnya, dan hapus pembetulan yang ternyata keliru."><b>Daftar Ingatan</b> — lihat &amp; hapus yang keliru</summary>
       <div id="setIngatan"></div></details>
     <div style="display:flex;margin-top:18px"><button class="btn btn-ghost" style="margin-left:auto" onclick="tutupModal()">Tutup</button></div>`;
   $id('overlay').classList.add('on');
@@ -6446,8 +6446,8 @@ function tampilSetBersama(){
       Total <b>${jumlahIngat}</b> pembetulan yang diingat.</p>
       <p class="kecil">${esc(b.folder)}</p>
       <div class="set-aksi">
-        ${b.manual ? `<button class="btn btn-ghost" onclick="aturFolderBersama('')">Kembali ke pencarian otomatis</button>` : ''}
-        <button class="btn btn-ghost" onclick="sinkronKKBersama(true).then(tampilSetBersama)">Segarkan</button>
+        ${b.manual ? `<button class="btn btn-ghost" onclick="aturFolderBersama('')" title="Lepas folder yang dipilih manual, lalu biarkan ORBIT mencari folder bersama sendiri seperti semula.">Kembali ke pencarian otomatis</button>` : ''}
+        <button class="btn btn-ghost" onclick="sinkronKKBersama(true).then(tampilSetBersama)" title="Ambil pembetulan kata terbaru dari laptop rekan sekarang juga, tanpa menunggu pembaruan otomatis.">Segarkan</button>
       </div>`;
     return;
   }
@@ -6931,7 +6931,7 @@ function renderCariStd(){
       <div id="stdStatusArsip" class="arsip-status">${teksStatusArsip()}</div>
       <div class="std-bar" style="margin:0;flex-wrap:wrap">
         <button class="btn" onclick="kumpulkanSemuaLaptop(this)">⇣ Kumpulkan dari semua laptop</button>
-        <button class="btn btn-ghost" onclick="unduhSemuaTranskripExcel(this)">⤓ Semua transkrip (Excel)</button>
+        <button class="btn btn-ghost" onclick="unduhSemuaTranskripExcel(this)" title="Unduh satu berkas Excel berisi seluruh catatan dari semua sesi, supaya mudah dibaca, dicari, dan diolah.">⤓ Semua transkrip (Excel)</button>
         <button class="btn btn-ghost" onclick="stdUnduhCadangan()">⤓ Simpan cadangan (JSON)</button>
         <button class="btn btn-ghost" onclick="$id('stdBerkasCadangan').click()">⤒ Muat cadangan</button>
         <input type="file" id="stdBerkasCadangan" accept=".json,application/json" style="display:none">
@@ -7270,9 +7270,9 @@ async function tampilSetArsip(){
       ? `✓ Salinannya ikut ke folder bersama. ${st.laptopLain ? `Sudah ada transkrip dari <b>${st.laptopLain}</b> laptop lain.` : 'Belum ada laptop lain yang ikut.'}`
       : 'Folder bersama <b>ORBIT-Bersama</b> belum tersambung (lihat bagian di bawah) — transkrip baru ada di laptop ini.'}</p>
     <div class="set-aksi">
-      <button class="btn btn-ghost" onclick="bukaFolderArsip(false)">Buka folder arsip</button>
-      ${st.bersama ? `<button class="btn btn-ghost" onclick="bukaFolderArsip(true)">Buka folder bersama</button>` : ''}
-      <button class="btn btn-ghost" onclick="unduhSemuaTranskripExcel(this)">Semua transkrip (Excel)</button>
+      <button class="btn btn-ghost" onclick="bukaFolderArsip(false)" title="Buka folder di laptop ini tempat semua catatan sesi tersimpan otomatis. Berguna untuk mengecek, menyalin, atau mengirim berkasnya.">Buka folder arsip</button>
+      ${st.bersama ? `<button class="btn btn-ghost" onclick="bukaFolderArsip(true)" title="Buka folder bersama yang dipakai semua laptop (lewat OneDrive). Di sini catatan dari laptop rekan juga terkumpul.">Buka folder bersama</button>` : ''}
+      <button class="btn btn-ghost" onclick="unduhSemuaTranskripExcel(this)" title="Unduh satu berkas Excel berisi seluruh catatan dari semua sesi, supaya mudah dibaca, dicari, dan diolah.">Semua transkrip (Excel)</button>
     </div>`;
 }
 async function bukaFolderArsip(bersama){
