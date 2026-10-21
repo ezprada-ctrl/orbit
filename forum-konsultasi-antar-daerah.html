@@ -6466,7 +6466,11 @@ function tampilSetBersama(){
       <div class="set-aksi">
         ${b.manual ? `<button class="btn btn-ghost" onclick="aturFolderBersama('')" title="Lepas folder yang dipilih manual, lalu biarkan ORBIT mencari folder bersama sendiri seperti semula.">Kembali ke pencarian otomatis</button>` : ''}
         <button class="btn btn-ghost" onclick="sinkronKKBersama(true).then(tampilSetBersama)" title="Ambil pembetulan kata terbaru dari laptop rekan sekarang juga, tanpa menunggu pembaruan otomatis.">Segarkan</button>
-      </div>`;
+      </div>
+      <details class="kecil"><summary>Pindah ke folder lain (mis. Google Drive)?</summary>
+        <div class="set-aksi"><input id="setFolderBersama" class="field" placeholder="Tempel alamat folder, mis. G:\My Drive\ORBIT-Bersama">
+        <button class="btn btn-ghost" onclick="aturFolderBersama($id('setFolderBersama').value)">Pakai</button></div>
+      </details>`;
     return;
   }
   el.innerHTML = `<p>Belum tersambung — pembetulan hanya diingat di laptop ini (${jumlahIngat} pembetulan).</p>
