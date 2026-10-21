@@ -6931,7 +6931,7 @@ function renderCariStd(){
       <div id="stdStatusArsip" class="arsip-status">${teksStatusArsip()}</div>
       <div class="std-bar" style="margin:0;flex-wrap:wrap">
         <button class="btn" onclick="kumpulkanSemuaLaptop(this)">⇣ Kumpulkan dari semua laptop</button>
-        <button class="btn btn-ghost" onclick="unduhSemuaTranskripExcel(this)" title="Unduh satu berkas Excel berisi seluruh catatan dari semua sesi, supaya mudah dibaca, dicari, dan diolah.">⤓ Semua transkrip (Excel)</button>
+        <button class="btn btn-ghost" onclick="unduhSemuaTranskripExcel(this)" title="Unduh satu berkas Excel berisi catatan semua sesi dari laptop ini DAN laptop lain yang tersambung ke folder bersama (kolom Laptop menunjukkan asalnya). Laptop yang belum tersambung belum ikut.">⤓ Semua transkrip (Excel)</button>
         <button class="btn btn-ghost" onclick="stdUnduhCadangan()">⤓ Simpan cadangan (JSON)</button>
         <button class="btn btn-ghost" onclick="$id('stdBerkasCadangan').click()">⤒ Muat cadangan</button>
         <input type="file" id="stdBerkasCadangan" accept=".json,application/json" style="display:none">
@@ -7272,7 +7272,7 @@ async function tampilSetArsip(){
     <div class="set-aksi">
       <button class="btn btn-ghost" onclick="bukaFolderArsip(false)" title="Buka folder di laptop ini tempat semua catatan sesi tersimpan otomatis. Berguna untuk mengecek, menyalin, atau mengirim berkasnya.">Buka folder arsip</button>
       ${st.bersama ? `<button class="btn btn-ghost" onclick="bukaFolderArsip(true)" title="Buka folder bersama yang dipakai semua laptop (lewat OneDrive). Di sini catatan dari laptop rekan juga terkumpul.">Buka folder bersama</button>` : ''}
-      <button class="btn btn-ghost" onclick="unduhSemuaTranskripExcel(this)" title="Unduh satu berkas Excel berisi seluruh catatan dari semua sesi, supaya mudah dibaca, dicari, dan diolah.">Semua transkrip (Excel)</button>
+      <button class="btn btn-ghost" onclick="unduhSemuaTranskripExcel(this)" title="Unduh satu berkas Excel berisi catatan semua sesi dari laptop ini DAN laptop lain yang tersambung ke folder bersama (kolom Laptop menunjukkan asalnya). Laptop yang belum tersambung belum ikut.">Semua transkrip (Excel)</button>
     </div>`;
 }
 async function bukaFolderArsip(bersama){
