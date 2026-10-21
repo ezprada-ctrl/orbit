@@ -872,6 +872,11 @@ body.mode-standar #panel{display:none!important}
 .std-hasil{display:flex;flex-direction:column;gap:10px}
 .std-hasil .resp{cursor:pointer}
 .std-hasil .sesi{font-size:12.5px;color:var(--text-dim);font-weight:700;margin-bottom:2px}
+.arsip-status{margin:16px 0 12px;font-size:14px;line-height:1.55;color:var(--text-dim)}
+.std-sampah{display:flex;flex-direction:column;gap:10px}
+.std-sampah .sesi{font-size:12.5px;color:var(--text-dim);font-weight:700;margin-bottom:2px}
+.std-sampah .std-aksi{opacity:1}
+.std-sampah .std-aksi .btn{padding:6px 12px;font-size:13px}
 .std-hasil mark,.std-tabel mark{background:var(--accent-soft);color:inherit;border-radius:3px}
 .set-opsi{display:grid;gap:12px;margin-top:14px}
 .set-bersama{margin-top:10px;font-size:14px;line-height:1.55}
@@ -1805,6 +1810,7 @@ let S = {
 function simpan(){
   try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
   tulisBerkas();   // bila ada berkas tersambung, ikut ditulis (tertunda)
+  jadwalArsip();   // salinan ke folder arsip-transkrip (BAGIAN I2)
 }
 function muat(){
   try{
@@ -1845,7 +1851,7 @@ function bungkusData(){
 function bukaData(obj){
   const s = (obj && obj.sesi) ? obj.sesi : obj;
   if(!s || !Array.isArray(s.masalah)) throw new Error('Berkas ini bukan data sesi Forum Konsultasi.');
-  return {tanggal: s.tanggal || new Date().toLocaleDateString('sv'),
+  return {tanggal: s.tanggal || new Date().toLocaleDateString('sv'), id: s.id || null,
           mode: 'PTP', aktifId: s.aktifId || null, masalah: s.masalah};
 }
 
@@ -4769,6 +4775,7 @@ document.getElementById('berkasMasuk').addEventListener('change', async e=>{
   e.target.value = '';                       // supaya berkas sama bisa dipilih lagi
   if(!f) return;
   if(S.masalah.length && !confirm('Data sesi saat ini akan DIGANTI oleh isi berkas.\n\nLanjutkan?')) return;
+  await arsipkanSekarang();   // sesi yang diganti tetap utuh di arsip transkrip
   try{
     terapkanData(bukaData(JSON.parse(await f.text())), 'Data sesi dimuat');
   }catch(err){ toast('Gagal membaca berkas: ' + err.message); }
@@ -6109,6 +6116,7 @@ async function kelasBaru(){
 async function mulaiKelasBaru(){
   if(!confirm('Mulai kelas baru dari awal?\n\nSEMUA data kelas ini dikosongkan dari browser: masalah, tanggapan, kesimpulan, serta peserta, bid, dan skor Liga.\nPastikan PDF risalah dan Excel Liga sudah diunduh. (Arsip Liga di folder arsip-liga tetap ada.)')) return;
   await arsipkanLiga(true);         // salinan terakhir Liga kelas lama ke disk
+  await arsipkanSekarang();         // transkrip forum kelas lama tetap utuh di arsip
   S = {tanggal:new Date().toLocaleDateString('sv'), mode:'PTP', aktifId:null, masalah:[]};
   prevStats = {m:0, d:0, t:0};
   simpan();
@@ -6235,6 +6243,9 @@ function muatContoh(jmlMasalah, jmlPenanggap, tipe){
   // "Data Contoh" aman diklik kapan saja tanpa risiko kehilangan data sesi asli.
   if(S.masalah.length && !S.contoh){
     if(!confirm('Data sesi saat ini akan dicadangkan otomatis, lalu diganti sementara oleh data contoh.\n\nBisa dikembalikan kapan saja lewat tombol "Kembali ke Data Asli". Lanjutkan?')) return false;
+    // paket disusun seketika, sebelum S diganti data contoh (yang tidak diarsipkan);
+    // dipanggil sebelum dicadangkan supaya id arsip sesi ini ikut tersimpan di cadangan
+    kirimArsip();
     try{ localStorage.setItem(CADANGAN_CONTOH_KEY, JSON.stringify(S)); }catch(e){}
   }
 
@@ -6360,7 +6371,7 @@ let stdTabAktif = 'catat';
 
 const idBaru = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 
-function simpanN(){ try{ localStorage.setItem(NKEY, JSON.stringify(N)); }catch(e){} }
+function simpanN(){ try{ localStorage.setItem(NKEY, JSON.stringify(N)); }catch(e){} jadwalArsip(); }
 function muatN(){
   try{
     const r = localStorage.getItem(NKEY);
@@ -6402,6 +6413,8 @@ function bukaSetelan(){
     <p style="color:var(--text-dim);font-size:13.5px;line-height:1.55;margin-top:14px">
       Data kedua mode tersimpan terpisah. Beralih mode tidak menghapus apa pun: data forum &amp; Liga
       dibekukan dan bisa dilanjutkan saat kembali.</p>
+    <div class="rk-lbl">Arsip Transkrip</div>
+    <div id="setArsip" class="set-bersama">Memeriksa…</div>
     <div class="rk-lbl">Ingatan Koreksi Dikte · Bersama</div>
     <div id="setBersama" class="set-bersama">Memeriksa…</div>
     <details class="set-bersama"><summary><b>Daftar Ingatan</b> — lihat &amp; hapus yang keliru</summary>
@@ -6409,6 +6422,7 @@ function bukaSetelan(){
     <div style="display:flex;margin-top:18px"><button class="btn btn-ghost" style="margin-left:auto" onclick="tutupModal()">Tutup</button></div>`;
   $id('overlay').classList.add('on');
   cariIngatan = '';
+  tampilSetArsip();
   tampilDaftarIngatan();
   sinkronKKBersama().then(() => { tampilSetBersama(); tampilDaftarIngatan(); });
 }
@@ -6715,8 +6729,12 @@ function stdSimpanUbah(eid){
 }
 function stdHapusEntri(eid){
   const s = sesiStd(), i = s.entri.findIndex(x => x.id === eid); if(i < 0) return;
-  if(!confirm('Hapus catatan nomor ' + (i+1) + '?')) return;
-  s.entri.splice(i, 1); simpanN(); renderFeedStd();
+  if(!confirm('Pindahkan catatan nomor ' + (i+1) + ' ke Tempat Sampah?\n\nBisa dipulihkan kapan saja dari tab Cari & Arsip.')) return;
+  const [e] = s.entri.splice(i, 1);
+  e.dihapus = new Date().toISOString();
+  (s.sampah = s.sampah || []).push(e);
+  simpanN(); renderFeedStd();
+  toast('Catatan dipindah ke Tempat Sampah.');
 }
 
 /* ---------------- Sesi ---------------- */
@@ -6745,8 +6763,10 @@ function stdGantiNamaSesi(){
 }
 function stdHapusSesi(id){
   const s = N.sesi.find(x => x.id === id); if(!s) return;
-  if(!confirm('Hapus sesi "' + judulSesiStd(s) + '" beserta ' + s.entri.length + ' catatan percakapannya?\n\nTindakan ini tidak bisa dibatalkan. Simpan cadangan JSON dulu bila ragu.')) return;
+  if(!confirm('Pindahkan sesi "' + judulSesiStd(s) + '" (' + s.entri.length + ' catatan) ke Tempat Sampah?\n\nSesi hilang dari daftar & pencarian, tapi bisa dipulihkan kapan saja dari bagian Tempat Sampah di bawah.')) return;
   N.sesi = N.sesi.filter(x => x.id !== id);
+  s.dihapus = new Date().toISOString();
+  (N.sampah = N.sampah || []).unshift(s);
   if(N.aktifId === id) N.aktifId = null;
   simpanN(); pastikanSesiStd(); renderStd();
 }
@@ -6908,14 +6928,16 @@ function renderCariStd(){
         <button class="btn btn-ghost" onclick="stdEksporWord('${x.id}')">Word</button>
         <button class="btn btn-ghost" onclick="stdHapusSesi('${x.id}')">Hapus</button></td></tr>`).join('')}
       </tbody></table>
-      <p class="sub" style="margin-top:16px">Data mode standar tersimpan di browser laptop ini. Simpan cadangan secara berkala
-        (taruh di OneDrive) — cadangan juga dipakai untuk memindahkan arsip ke laptop lain.</p>
-      <div class="std-bar" style="margin:0">
-        <button class="btn" onclick="stdUnduhCadangan()">⤓ Simpan cadangan (JSON)</button>
+      <div id="stdStatusArsip" class="arsip-status">${teksStatusArsip()}</div>
+      <div class="std-bar" style="margin:0;flex-wrap:wrap">
+        <button class="btn" onclick="kumpulkanSemuaLaptop(this)">⇣ Kumpulkan dari semua laptop</button>
+        <button class="btn btn-ghost" onclick="unduhSemuaTranskripExcel(this)">⤓ Semua transkrip (Excel)</button>
+        <button class="btn btn-ghost" onclick="stdUnduhCadangan()">⤓ Simpan cadangan (JSON)</button>
         <button class="btn btn-ghost" onclick="$id('stdBerkasCadangan').click()">⤒ Muat cadangan</button>
         <input type="file" id="stdBerkasCadangan" accept=".json,application/json" style="display:none">
       </div>
-    </div>`;
+    </div>
+    ${htmlTempatSampah()}`;
   const q = $id('stdQ');
   q.addEventListener('input', ()=>{ stdQ = q.value; renderHasilCari(); });
   $id('stdBerkasCadangan').addEventListener('change', async e=>{
@@ -6970,24 +6992,296 @@ function stdUnduhCadangan(){
   unduhBlob(new Blob([isi], {type:'application/json'}), 'notulen-mode-standar-' + hariIni() + '.json');
   toast('Cadangan ' + N.sesi.length + ' sesi diunduh.');
 }
-/* Digabung per id sesi, bukan ditimpa: sesi di laptop ini yang tidak ada
-   di cadangan tetap aman. Sesi dengan id sama diganti versi cadangan. */
+/* Digabung, tidak pernah ditimpa: sesi baru ditambahkan, sesi yang sudah ada
+   hanya ketambahan catatan yang belum dimilikinya (lihat gabungkanSesiStd). */
 async function stdMuatCadangan(f){
   try{
     const o = JSON.parse(await f.text());
     const d = o && o.data ? o.data : o;
     if(!d || !Array.isArray(d.sesi)) throw new Error('berkas ini bukan cadangan Mode Standar.');
-    const ada = new Set(N.sesi.map(s => s.id));
-    const ganti = d.sesi.filter(s => ada.has(s.id)).length;
-    if(ganti && !confirm(ganti + ' sesi di cadangan juga ada di laptop ini dan akan DIGANTI versi cadangan.\n\nLanjutkan?')) return;
-    d.sesi.forEach(s=>{
-      const i = N.sesi.findIndex(x => x.id === s.id);
-      if(i >= 0) N.sesi[i] = s; else N.sesi.push(s);
-    });
-    N.sesi.sort((a,b)=> (b.tanggal || '').localeCompare(a.tanggal || ''));
+    const h = gabungkanKeN(d.sesi.concat(d.sampah || []));
     simpanN(); renderStd();
-    toast('Cadangan dimuat: ' + d.sesi.length + ' sesi (' + (d.sesi.length - ganti) + ' baru).');
+    toast('Cadangan dimuat: ' + h.sesiBaru + ' sesi baru, ' + h.catatanBaru + ' catatan baru. Tidak ada yang ditimpa.');
   }catch(e){ toast('Gagal memuat cadangan: ' + e.message); }
+}
+
+/* ==================================================================
+   BAGIAN I2 — ARSIP TRANSKRIP (tidak ada yang hilang)
+   ------------------------------------------------------------------
+   Tiap perubahan sesi (Mode Standar maupun forum Mode Gamifikasi)
+   dikirim ke server laptop, yang menulisnya ke folder arsip-transkrip/
+   dan — bila folder ORBIT-Bersama tersambung — ke subfolder laptop ini
+   di ORBIT-Bersama/Transkrip/. Koordinator lalu bisa mengumpulkan
+   transkrip semua PTP jadi satu (Kumpulkan / Excel).
+
+   Tiga pengaman supaya transkrip tidak pernah hilang:
+     1. Hapus = pindah ke Tempat Sampah (N.sampah / s.sampah), bisa dipulihkan.
+     2. Menggabung (cadangan / laptop lain) hanya MENAMBAH, tidak menimpa.
+     3. Server menyalin versi lama ke riwayat/ bila jumlah catatannya menyusut.
+   Data contoh (S.contoh) tidak diarsipkan. Dari file:// arsip tidak jalan
+   (tidak ada server) — cadangan JSON manual tetap tersedia.
+   ================================================================== */
+var ARSIP = null;   // var: simpan() bisa terpanggil sebelum baris ini dijalankan
+ARSIP = {terkirim:{}, tunda:null, aktif:null, bersama:false, terakhir:null, status:null};
+
+function jadwalArsip(){
+  if(!ARSIP || PANGGUNG || location.protocol === 'file:') return;
+  clearTimeout(ARSIP.tunda);
+  ARSIP.tunda = setTimeout(kirimArsip, 1500);
+}
+
+const jumlahCatatanStd = s => s.entri.length + (s.sampah || []).length;
+const jumlahCatatanForum = d => d.masalah.reduce((n, m) => n + 1 + (m.tanggapan || []).length + (m.kesimpulan ? 1 : 0), 0);
+
+/* Paket yang belum terkirim versi terakhirnya. Disusun SEKETIKA (tanpa await)
+   supaya pemanggil boleh mengganti S/N tepat sesudahnya. */
+function paketArsip(){
+  const paket = [];
+  N.sesi.concat(N.sampah || []).forEach(s=>{
+    if(!jumlahCatatanStd(s)) return;   // sesi kosong yang baru dibuat belum perlu diarsipkan
+    paket.push({jenis:'standar', id:s.id, judul:judulSesiStd(s), tanggal:s.tanggal,
+                jumlah:jumlahCatatanStd(s), bagikan:!s.asalLaptop, data:s});
+  });
+  if(!S.contoh && S.masalah.length){
+    if(!S.id){
+      S.id = idBaru('f');
+      try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
+    }
+    paket.push({jenis:'forum', id:S.id, judul:'Forum ' + ((L && L.kelas && L.kelas.nama) || 'Konsultasi'),
+                tanggal:S.tanggal, jumlah:jumlahCatatanForum(S), bagikan:true,
+                data:Object.assign({}, S, {kelas:(L && L.kelas && L.kelas.nama) || ''})});
+  }
+  return paket.map(p => ({p, isi:JSON.stringify(p)}))
+              .filter(x => ARSIP.terkirim[x.p.jenis + x.p.id] !== x.isi);
+}
+
+async function kirimArsip(){
+  if(!ARSIP || PANGGUNG || location.protocol === 'file:') return;
+  clearTimeout(ARSIP.tunda);
+  const antre = paketArsip();
+  for(const x of antre){
+    try{
+      const r = await fetch('/api/transkrip', {method:'POST', headers:{'Content-Type':'application/json'}, body:x.isi});
+      const d = await r.json();
+      if(!d.ok) throw new Error(d.pesan || 'gagal');
+      ARSIP.terkirim[x.p.jenis + x.p.id] = x.isi;
+      ARSIP.aktif = true; ARSIP.terakhir = new Date();
+      if(x.p.bagikan) ARSIP.bersama = !!d.bersama;   // sesi kiriman laptop lain memang tidak dibagikan ulang
+    }catch(e){
+      ARSIP.aktif = false;
+      ARSIP.tunda = setTimeout(kirimArsip, 20000);   // server mati sebentar / disk sibuk: coba lagi
+      break;
+    }
+  }
+  const el = $id('stdStatusArsip'); if(el) el.innerHTML = teksStatusArsip();
+}
+async function arsipkanSekarang(){ try{ await kirimArsip(); }catch(e){} }
+
+// halaman ditutup/di-refresh sebelum jeda 1,5 detik habis: kirim sisanya lewat beacon
+window.addEventListener('pagehide', ()=>{
+  if(!ARSIP || PANGGUNG || location.protocol === 'file:' || !navigator.sendBeacon) return;
+  try{ paketArsip().forEach(x => navigator.sendBeacon('/api/transkrip', new Blob([x.isi], {type:'application/json'}))); }catch(e){}
+});
+
+function teksStatusArsip(){
+  if(location.protocol === 'file:')
+    return '⚠ Arsip otomatis hanya jalan bila ORBIT dibuka lewat <b>ORBIT-execute.bat</b>. Sementara ini simpan cadangan secara manual.';
+  if(ARSIP.aktif === false)
+    return '⚠ Arsip otomatis sedang tidak tersambung ke server ORBIT — data tetap aman di browser, akan dicoba lagi.';
+  const jam = ARSIP.terakhir ? ' (terakhir ' + ARSIP.terakhir.toTimeString().slice(0,5) + ')' : '';
+  return '✓ Tiap catatan otomatis tersimpan ke folder arsip di laptop ini' + jam + '.'
+    + (ARSIP.bersama ? ' Salinannya ikut ke folder bersama <b>ORBIT-Bersama</b>, jadi koordinator bisa mengumpulkan transkrip semua laptop.'
+                     : ' Folder bersama ORBIT-Bersama belum tersambung — arsip baru ada di laptop ini.');
+}
+
+/* ---------- Penggabungan tanpa menimpa ---------- */
+function gabungkanSesiStd(a, b){
+  const ada = new Set(a.entri.concat(a.sampah || []).map(e => e.id));
+  let baru = 0;
+  b.entri.forEach(e => { if(!ada.has(e.id)){ a.entri.push(e); ada.add(e.id); baru++; } });
+  (b.sampah || []).forEach(e => { if(!ada.has(e.id)){ (a.sampah = a.sampah || []).push(e); ada.add(e.id); } });
+  const pid = new Set(a.peserta.map(p => p.id));
+  (b.peserta || []).forEach(p => { if(!pid.has(p.id)) a.peserta.push(p); });
+  if(baru) a.entri.sort((x, y) => (x.waktu || '').localeCompare(y.waktu || ''));
+  ['judul', 'tempat'].forEach(k => { if(!a[k] && b[k]) a[k] = b[k]; });
+  return baru;
+}
+function rapikanSesiStd(s){
+  s.peserta = Array.isArray(s.peserta) ? s.peserta : [];
+  s.entri = Array.isArray(s.entri) ? s.entri : [];
+  s.judul = s.judul || ''; s.jenis = s.jenis || 'Rapat'; s.tempat = s.tempat || ''; s.tanggal = s.tanggal || hariIni();
+  return s;
+}
+/* daftar: sesi Mode Standar dari mana pun (cadangan, laptop lain). asal = id laptop pengirim
+   bila bukan laptop ini — sesi itu tidak dibagikan ulang ke folder bersama atas nama laptop ini. */
+function gabungkanKeN(daftar, asal){
+  let sesiBaru = 0, catatanBaru = 0;
+  N.sampah = N.sampah || [];
+  daftar.forEach(m=>{
+    if(!m || !m.id) return;
+    const lokal = N.sesi.find(x => x.id === m.id) || N.sampah.find(x => x.id === m.id);
+    if(lokal){ catatanBaru += gabungkanSesiStd(lokal, rapikanSesiStd(m)); return; }
+    const s = rapikanSesiStd(JSON.parse(JSON.stringify(m)));
+    if(asal && !s.asalLaptop) s.asalLaptop = asal;
+    (s.dihapus ? N.sampah : N.sesi).push(s);
+    sesiBaru++; catatanBaru += s.entri.length;
+  });
+  N.sesi.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
+  return {sesiBaru, catatanBaru};
+}
+
+/* ---------- Mengumpulkan dari semua laptop ---------- */
+async function ambilSemuaTranskrip(){
+  if(location.protocol === 'file:'){ toast('Butuh ORBIT yang dibuka lewat ORBIT-execute.bat.'); return null; }
+  await arsipkanSekarang();
+  try{
+    const d = await (await fetch('/api/transkrip/semua', {cache:'no-store'})).json();
+    if(!d.ok) throw new Error(d.pesan);
+    return d;
+  }catch(e){ toast('Server ORBIT tidak menjawab — jalankan ORBIT-execute.bat.'); return null; }
+}
+async function kumpulkanSemuaLaptop(btn){
+  if(btn) btn.disabled = true;
+  const d = await ambilSemuaTranskrip();
+  if(btn) btn.disabled = false;
+  if(!d) return;
+  const std = d.transkrip.filter(t => t.jenis === 'standar');
+  const laptop = new Set(std.map(t => t.laptop).filter(x => x && x !== d.laptop));
+  const h = std.reduce((acc, t)=>{
+    const r = gabungkanKeN([t.data], t.laptop !== d.laptop ? t.laptop : null);
+    acc.sesiBaru += r.sesiBaru; acc.catatanBaru += r.catatanBaru; return acc;
+  }, {sesiBaru:0, catatanBaru:0});
+  simpanN(); renderStd();
+  toast(laptop.size
+    ? 'Dari ' + laptop.size + ' laptop lain: ' + h.sesiBaru + ' sesi baru, ' + h.catatanBaru + ' catatan baru masuk.'
+    : 'Belum ada transkrip dari laptop lain di folder bersama.');
+}
+
+/* Satu tabel datar untuk diolah lanjut: satu baris = satu ucapan, dari semua laptop & kedua mode. */
+async function unduhSemuaTranskripExcel(btn){
+  if(btn) btn.disabled = true;
+  const d = location.protocol === 'file:' ? null : await ambilSemuaTranskrip();
+  if(btn) btn.disabled = false;
+  if(!d && location.protocol !== 'file:') return;
+  // tanpa server (file://): cukup data di browser ini
+  const daftar = d ? d.transkrip : N.sesi.concat(N.sampah || []).map(s => ({jenis:'standar', data:s}))
+    .concat(!S.contoh && S.masalah.length ? [{jenis:'forum', data:Object.assign({}, S, {id:S.id || 'forum'})}] : []);
+  // sesi yang sama bisa datang dari arsip lokal dan salinan bersama: digabung per id
+  const unik = new Map();
+  daftar.forEach(t=>{
+    const k = t.jenis + ':' + (t.data && t.data.id || t.id);
+    const lama = unik.get(k);
+    // sesi yang dikumpulkan dari laptop lain tetap dicatat atas nama laptop asalnya
+    if(!lama){ unik.set(k, {laptop:t.data.asalLaptop || t.laptop || '', jenis:t.jenis, data:JSON.parse(JSON.stringify(t.data))}); return; }
+    if(t.jenis === 'standar') gabungkanSesiStd(rapikanSesiStd(lama.data), rapikanSesiStd(t.data));
+    else if(jumlahCatatanForum(t.data) > jumlahCatatanForum(lama.data)) lama.data = t.data;
+  });
+  const baris = [['Laptop', 'Mode', 'Tanggal', 'Kegiatan / Kelas', 'Masalah', 'No', 'Jenis Catatan', 'Pembicara', 'Unit Kerja / Jabatan', 'Daerah', 'Isi', 'Waktu', 'Status']];
+  const sesiRingkas = [['Laptop', 'Mode', 'Tanggal', 'Kegiatan / Kelas', 'Jumlah Catatan', 'Status']];
+  [...unik.values()].sort((a, b) => (a.data.tanggal || '').localeCompare(b.data.tanggal || '')).forEach(u=>{
+    const s = u.data, lap = u.laptop;
+    if(u.jenis === 'standar'){
+      const st = s.dihapus ? 'di Tempat Sampah' : 'aktif';
+      const semua = s.entri.map(e => [e, st]).concat((s.sampah || []).map(e => [e, 'di Tempat Sampah']));
+      semua.forEach(([e, status], i)=>{
+        const p = penutur(s, e);
+        baris.push([lap, 'Standar', s.tanggal, judulSesiStd(s) + (s.jenis ? ' (' + s.jenis + ')' : ''), '', i + 1, 'Ucapan',
+                    p.nama, p.unit, '', e.isi, e.waktu ? new Date(e.waktu).toLocaleString('id-ID') : '', status]);
+      });
+      sesiRingkas.push([lap, 'Standar', s.tanggal, judulSesiStd(s), jumlahCatatanStd(s), st]);
+    }else{
+      const kelas = s.kelas || 'Forum Konsultasi';
+      let no = 0;
+      (s.masalah || []).forEach(m=>{
+        const o = orangDari(m) || {};
+        baris.push([lap, 'Gamifikasi', s.tanggal, kelas, m.judul, ++no, 'Masalah', o.nama || '', o.jabatan || o.unit || '', m.daerah,
+                    [m.judul, m.deskripsi].filter(Boolean).join(' — '), m.waktu ? new Date(m.waktu).toLocaleString('id-ID') : '', 'aktif']);
+        (m.tanggapan || []).forEach(t=>{
+          const ot = orangDari(t) || {};
+          baris.push([lap, 'Gamifikasi', s.tanggal, kelas, m.judul, ++no, 'Tanggapan', ot.nama || '', ot.jabatan || ot.unit || '', t.daerah, t.isi, '', 'aktif']);
+        });
+        if(m.kesimpulan) baris.push([lap, 'Gamifikasi', s.tanggal, kelas, m.judul, ++no, 'Kesimpulan WI', 'Widyaiswara', '', '', m.kesimpulan, '', 'aktif']);
+      });
+      sesiRingkas.push([lap, 'Gamifikasi', s.tanggal, kelas, jumlahCatatanForum(s), 'aktif']);
+    }
+  });
+  if(baris.length < 2){ toast('Belum ada transkrip yang tersimpan.'); return; }
+  if(!(await pastikanXLSX())){ toast('Library Excel gagal dimuat — periksa koneksi internet, lalu klik lagi.'); return; }
+  const wb = XLSX.utils.book_new();
+  const lembar = (data, n, lebar)=>{ const ws = XLSX.utils.aoa_to_sheet(data); ws['!cols'] = lebar.map(w => ({wch:w})); XLSX.utils.book_append_sheet(wb, ws, n); };
+  lembar(baris, 'Transkrip', [22, 11, 11, 32, 32, 6, 14, 24, 26, 24, 80, 18, 16]);
+  lembar(sesiRingkas, 'Daftar Sesi', [22, 11, 11, 40, 15, 16]);
+  XLSX.writeFile(wb, 'transkrip-semua-laptop-' + hariIni() + '.xlsx');
+  toast('Excel diunduh: ' + (baris.length - 1) + ' catatan dari ' + (sesiRingkas.length - 1) + ' sesi.');
+}
+
+/* ---------- Tempat Sampah (Mode Standar) ---------- */
+function htmlTempatSampah(){
+  const sesi = N.sampah || [];
+  const catatan = [];
+  N.sesi.forEach(s => (s.sampah || []).forEach(e => catatan.push({s, e})));
+  if(!sesi.length && !catatan.length) return '';
+  return `<div class="std-card" style="margin-top:18px">
+      <h4>🗑 Tempat Sampah · ${sesi.length + catatan.length}</h4>
+      <p class="sub">Yang dihapus berpindah ke sini dan tidak pernah dibuang — tetap ada di arsip dan bisa dipulihkan kapan saja.</p>
+      ${sesi.length ? `<table class="std-tabel"><thead><tr><th>Tanggal</th><th>Sesi</th><th>Catatan</th><th>Dihapus</th><th></th></tr></thead><tbody>
+        ${sesi.map(x => `<tr><td>${esc(tanggalPendek(x.tanggal))}</td><td>${esc(judulSesiStd(x))}</td><td>${x.entri.length}</td>
+          <td>${esc(new Date(x.dihapus).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'}))}</td>
+          <td class="aksi"><button class="btn btn-ghost" onclick="stdPulihkanSesi('${x.id}')">Pulihkan</button></td></tr>`).join('')}
+      </tbody></table>` : ''}
+      ${catatan.length ? `<div class="blok-judul" style="margin-top:12px">Catatan yang dihapus</div>
+        <div class="std-sampah">${catatan.map(({s, e}) => { const p = penutur(s, e); return `<div class="resp">
+          <div class="std-aksi"><button class="btn btn-ghost" onclick="stdPulihkanEntri('${s.id}','${e.id}')">Pulihkan</button></div>
+          <div class="sesi">${esc(judulSesiStd(s))}</div>
+          <div class="who">${esc(p.nama)}${p.unit ? `<span class="unit">· ${esc(p.unit)}</span>` : ''}</div>
+          <div class="txt">${esc(e.isi)}</div></div>`; }).join('')}</div>` : ''}
+    </div>`;
+}
+function stdPulihkanSesi(id){
+  const i = (N.sampah || []).findIndex(x => x.id === id); if(i < 0) return;
+  const [s] = N.sampah.splice(i, 1);
+  delete s.dihapus;
+  N.sesi.push(s);
+  N.sesi.sort((a, b) => (b.tanggal || '').localeCompare(a.tanggal || ''));
+  simpanN(); renderStd();
+  toast('Sesi "' + judulSesiStd(s) + '" dipulihkan.');
+}
+function stdPulihkanEntri(sid, eid){
+  const s = N.sesi.find(x => x.id === sid); if(!s || !s.sampah) return;
+  const i = s.sampah.findIndex(x => x.id === eid); if(i < 0) return;
+  const [e] = s.sampah.splice(i, 1);
+  delete e.dihapus;
+  s.entri.push(e);
+  s.entri.sort((x, y) => (x.waktu || '').localeCompare(y.waktu || ''));
+  simpanN(); renderStd();
+  toast('Catatan dipulihkan ke sesi "' + judulSesiStd(s) + '".');
+}
+
+/* ---------- Status di Setelan (kedua mode) ---------- */
+async function tampilSetArsip(){
+  const el = $id('setArsip'); if(!el) return;
+  if(location.protocol === 'file:'){ el.innerHTML = `<p>${teksStatusArsip()}</p>`; return; }
+  let st = null;
+  try{ st = await (await fetch('/api/transkrip/status', {cache:'no-store'})).json(); }catch(e){}
+  if(!st || !st.ok){ el.innerHTML = '<p>Server ORBIT tidak menjawab — jalankan lewat <b>ORBIT-execute.bat</b>.</p>'; return; }
+  el.innerHTML = `<p class="ok">✓ Semua transkrip (Mode Standar &amp; forum) otomatis tersimpan di folder arsip laptop ini — <b>${st.jumlahLokal}</b> sesi.</p>
+    <p class="kecil">${esc(st.lokal)}</p>
+    <p>${st.bersama
+      ? `✓ Salinannya ikut ke folder bersama. ${st.laptopLain ? `Sudah ada transkrip dari <b>${st.laptopLain}</b> laptop lain.` : 'Belum ada laptop lain yang ikut.'}`
+      : 'Folder bersama <b>ORBIT-Bersama</b> belum tersambung (lihat bagian di bawah) — transkrip baru ada di laptop ini.'}</p>
+    <div class="set-aksi">
+      <button class="btn btn-ghost" onclick="bukaFolderArsip(false)">Buka folder arsip</button>
+      ${st.bersama ? `<button class="btn btn-ghost" onclick="bukaFolderArsip(true)">Buka folder bersama</button>` : ''}
+      <button class="btn btn-ghost" onclick="unduhSemuaTranskripExcel(this)">Semua transkrip (Excel)</button>
+    </div>`;
+}
+async function bukaFolderArsip(bersama){
+  await arsipkanSekarang();
+  try{
+    const d = await (await fetch('/api/transkrip/buka-folder', {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({bersama})})).json();
+    if(!d.ok) toast(d.pesan || 'Folder tidak bisa dibuka.');
+  }catch(e){ toast('Server ORBIT tidak menjawab.'); }
 }
 
 /* ---------------- Ekspor PDF ---------------- */
@@ -8403,6 +8697,7 @@ async function cekSiapKelas(){
   // ?demo memuat data contoh; bila penggantian data dibatalkan, alur normal tetap jalan
   const pakaiContoh = /(^|[?&])demo/.test(location.search) && muatContoh(12, 50);
   muatN();
+  jadwalArsip();   // transkrip yang sudah ada (termasuk dari sebelum fitur arsip) langsung diarsipkan
   // SELALU dibuka di layar pembuka, apa pun sesi terakhirnya (forum maupun Mode Standar).
   // Sesi terakhir dilanjutkan lewat tombol "Lanjutkan Sesi Terakhir" di layar itu.
   // modeApp di memori dimulai 'gamifikasi' (layar pembuka milik mode itu); pilihan mode

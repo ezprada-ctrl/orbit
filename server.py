@@ -297,6 +297,150 @@ def status_bersama(paksa=False):
     return hasil
 
 
+"""
+ARSIP TRANSKRIP — setiap sesi (Mode Standar maupun forum Mode Gamifikasi)
+ditulis ke berkas sendiri, otomatis tiap ada perubahan:
+
+  arsip-transkrip/<tanggal>_<jenis>_<judul>__<id>.json      (laptop ini)
+  ORBIT-Bersama/Transkrip/<id-laptop>/<nama yang sama>       (salinan bersama)
+
+Folder arsip bukan bagian BERKAS_APLIKASI, jadi update tidak pernah
+menyentuhnya. Di folder bersama tiap laptop hanya menulis subfoldernya
+sendiri (pola sama dengan ingatan koreksi) -> tidak ada salinan konflik,
+dan koordinator tinggal mengumpulkan semua subfolder.
+
+Tidak ada yang dihapus: bila kiriman baru memuat LEBIH SEDIKIT catatan
+daripada berkas yang ada (mis. masalah forum dihapus), berkas lama lebih
+dulu disalin ke arsip-transkrip/riwayat/ dengan stempel waktu.
+"""
+FOLDER_TRANSKRIP = os.path.join(AKAR, 'arsip-transkrip')
+SUBFOLDER_TRANSKRIP = 'Transkrip'
+
+
+def folder_transkrip_bersama():
+    folder = cari_folder_bersama()
+    return os.path.join(folder, SUBFOLDER_TRANSKRIP, id_laptop()) if folder else None
+
+
+def jalur_panjang(p):
+    """Windows menolak alamat > 260 karakter — gampang terlampaui bila ORBIT
+    diekstrak di folder OneDrive yang dalam. Awalan \\\\?\\ mencabut batas itu."""
+    p = os.path.abspath(p)
+    if os.name == 'nt' and len(p) > 200 and not p.startswith('\\\\?\\'):
+        return '\\\\?\\UNC\\' + p[2:] if p.startswith('\\\\') else '\\\\?\\' + p
+    return p
+
+
+def tulis_transkrip(folder, nama, isi, jaga_riwayat):
+    """Tulis atomik; berkas lama milik sesi yang sama (judul berganti -> nama
+    berganti) digantikan. Mengembalikan alamat berkas."""
+    folder = jalur_panjang(folder)
+    os.makedirs(folder, exist_ok=True)
+    akhiran = '__' + nama.rsplit('__', 1)[1]
+    lama = [n for n in os.listdir(folder) if n.endswith(akhiran)]
+    if jaga_riwayat:
+        for n in lama:
+            try:
+                with open(os.path.join(folder, n), encoding='utf-8-sig') as f:
+                    sebelum = json.load(f)
+            except Exception:
+                continue
+            if int(sebelum.get('jumlah') or 0) > int(isi.get('jumlah') or 0):
+                riwayat = os.path.join(folder, 'riwayat')
+                os.makedirs(riwayat, exist_ok=True)
+                with open(os.path.join(riwayat, n[:-5] + '__' + time.strftime('%Y%m%d-%H%M%S') + '.json'),
+                          'w', encoding='utf-8') as f:
+                    json.dump(sebelum, f, ensure_ascii=False, indent=1)
+    tujuan = os.path.join(folder, nama)
+    sementara = tujuan + '.tmp'
+    with open(sementara, 'w', encoding='utf-8') as f:
+        json.dump(isi, f, ensure_ascii=False, indent=1)
+    os.replace(sementara, tujuan)
+    for n in lama:
+        if n != nama:
+            try:
+                os.remove(os.path.join(folder, n))   # versi bernama lama dari sesi yang SAMA
+            except OSError:
+                pass
+    return tujuan
+
+
+def simpan_transkrip(data):
+    jenis = 'forum' if data.get('jenis') == 'forum' else 'standar'
+    sid = nama_berkas_aman(data.get('id'))[:40]
+    if not sid or not isinstance(data.get('data'), dict):
+        raise ValueError('Data transkrip tidak lengkap.')
+    tanggal = re.sub(r'[^0-9-]', '', str(data.get('tanggal') or ''))[:10] or time.strftime('%Y-%m-%d')
+    nama = '%s_%s_%s__%s.json' % (tanggal, jenis, nama_berkas_aman(data.get('judul'))[:30], sid)
+    isi = {'aplikasi': 'orbit-transkrip', 'versi': 1, 'jenis': jenis, 'laptop': id_laptop(),
+           'disimpan': time.strftime('%Y-%m-%dT%H:%M:%S'), 'jumlah': int(data.get('jumlah') or 0),
+           'data': data['data']}
+    tulis_transkrip(FOLDER_TRANSKRIP, nama, isi, True)
+    bersama = folder_transkrip_bersama() if data.get('bagikan', True) else None
+    if bersama:
+        try:
+            tulis_transkrip(bersama, nama, isi, False)
+        except OSError:
+            bersama = None   # OneDrive sedang mengunci berkas -> dicoba lagi di kiriman berikutnya
+    return {'ok': True, 'bersama': bool(bersama)}
+
+
+def baca_folder_transkrip(folder, laptop_bawaan=None):
+    hasil = []
+    folder = jalur_panjang(folder)
+    try:
+        nama_nama = os.listdir(folder)
+    except OSError:
+        return hasil
+    for n in nama_nama:
+        if not n.endswith('.json'):
+            continue
+        try:
+            with open(os.path.join(folder, n), encoding='utf-8-sig') as f:
+                isi = json.load(f)
+        except Exception:
+            continue   # sedang disalin OneDrive / rusak -> dilewati
+        if isi.get('aplikasi') != 'orbit-transkrip' or not isinstance(isi.get('data'), dict):
+            continue
+        isi['laptop'] = isi.get('laptop') or laptop_bawaan
+        isi['berkas'] = n
+        hasil.append(isi)
+    return hasil
+
+
+def semua_transkrip():
+    """Arsip laptop ini + semua laptop di folder bersama. Sesi yang sama bisa
+    muncul dua kali (lokal & salinan bersamanya) — aplikasi menggabungkannya."""
+    hasil = baca_folder_transkrip(FOLDER_TRANSKRIP, id_laptop())
+    folder = cari_folder_bersama()
+    if folder:
+        induk = os.path.join(folder, SUBFOLDER_TRANSKRIP)
+        try:
+            laptop_laptop = [e for e in os.scandir(induk) if e.is_dir()]
+        except OSError:
+            laptop_laptop = []
+        for e in laptop_laptop:
+            hasil += baca_folder_transkrip(e.path, e.name)
+    return hasil
+
+
+def status_transkrip():
+    folder = cari_folder_bersama()
+    induk = os.path.join(folder, SUBFOLDER_TRANSKRIP) if folder else None
+    try:
+        lokal = len([n for n in os.listdir(FOLDER_TRANSKRIP) if n.endswith('.json')])
+    except OSError:
+        lokal = 0
+    laptop = []
+    if induk:
+        try:
+            laptop = [e.name for e in os.scandir(induk) if e.is_dir()]
+        except OSError:
+            pass
+    return {'ok': True, 'lokal': FOLDER_TRANSKRIP, 'jumlahLokal': lokal, 'bersama': induk,
+            'laptop': id_laptop(), 'laptopLain': len([x for x in laptop if x != id_laptop()])}
+
+
 def unduh_dan_pasang_update():
     """Tarik rilis terbaru dari GitHub lalu pasang di tempat. Mengembalikan
     ETag rilis yang baru dipasang (dicatat pemanggil ke TANDA_VERSI), atau
@@ -453,7 +597,7 @@ class Penangan(SimpleHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
         # log ringkas: sembunyikan polling rutin supaya jendela hitam tetap terbaca
-        if any(k in self.path for k in ('/api/liga/status', '/api/liga/bids', '/api/liga/nilai', '/api/info', '/api/koreksi')):
+        if any(k in self.path for k in ('/api/liga/status', '/api/liga/bids', '/api/liga/nilai', '/api/info', '/api/koreksi', '/api/transkrip')):
             return
         sys.stderr.write('  %s  %s\n' % (self.client_address[0], fmt % args))
 
@@ -497,6 +641,13 @@ class Penangan(SimpleHTTPRequestHandler):
             if not self.dari_laptop():
                 return self.kirim_json({'ok': False, 'pesan': 'Tidak diizinkan.'}, 403)
             return self.kirim_json(status_bersama(paksa='cari=1' in self.path))
+
+        if jalur in ('/api/transkrip/status', '/api/transkrip/semua'):
+            if not self.dari_laptop():
+                return self.kirim_json({'ok': False, 'pesan': 'Tidak diizinkan.'}, 403)
+            if jalur == '/api/transkrip/status':
+                return self.kirim_json(status_transkrip())
+            return self.kirim_json({'ok': True, 'laptop': id_laptop(), 'transkrip': semua_transkrip()})
 
         if jalur == '/api/liga/bids':
             if not self.dari_laptop():
@@ -633,6 +784,26 @@ class Penangan(SimpleHTTPRequestHandler):
             except OSError as e:
                 return self.kirim_json({'ok': False, 'pesan': str(e)})
             return self.kirim_json(status_bersama(paksa=True))
+
+        if jalur == '/api/transkrip':
+            try:
+                return self.kirim_json(simpan_transkrip(data))
+            except (OSError, ValueError) as e:
+                return self.kirim_json({'ok': False, 'pesan': str(e)})
+
+        if jalur == '/api/transkrip/buka-folder':
+            folder = FOLDER_TRANSKRIP
+            if data.get('bersama'):
+                b = cari_folder_bersama()
+                folder = os.path.join(b, SUBFOLDER_TRANSKRIP) if b else None
+            if not folder:
+                return self.kirim_json({'ok': False, 'pesan': 'Folder bersama belum tersambung.'})
+            try:
+                os.makedirs(folder, exist_ok=True)
+                os.startfile(folder)
+            except (OSError, AttributeError) as e:
+                return self.kirim_json({'ok': False, 'pesan': 'Folder tidak bisa dibuka: %s' % e})
+            return self.kirim_json({'ok': True})
 
         if jalur == '/api/liga/arsip':
             kelas = (data.get('kelas') or {})

@@ -538,7 +538,8 @@ Untuk rapat, pelatihan lain, atau forum yang tidak memakai game.
 - **Mencatat:** tab *Percakapan* → pilih pembicara → ketik atau **Dikte** → Ctrl+Enter. Pembicara tetap terpilih agar ucapan panjang bisa didikte beberapa potong.
 - **Ekspor:** tombol *Unduh PDF* / *Unduh Word* (sampul → daftar peserta → transkrip bernomor).
 - **Knowledge base:** tab *Cari & Arsip* menelusuri seluruh sesi (isi, pembicara, unit, judul). Klik hasil untuk lompat ke catatannya.
-- **Cadangan:** data Mode Standar hanya di browser laptop itu — rutin klik *Simpan cadangan (JSON)* ke OneDrive; *Muat cadangan* menggabungkan arsip di laptop lain.
+- **Arsip otomatis:** tiap catatan langsung tersalin ke folder `arsip-transkrip` (lihat §17). *Simpan cadangan (JSON)* tetap ada sebagai cadangan manual; *Muat cadangan* hanya menambah sesi/catatan yang belum ada, tidak pernah menimpa.
+- **Hapus = Tempat Sampah:** sesi atau catatan yang dihapus pindah ke bagian *Tempat Sampah* di tab *Cari & Arsip* dan bisa dipulihkan kapan saja.
 
 ## 15. Layar Panggung, Pengumuman Peringkat & Peta
 
@@ -643,3 +644,33 @@ dari **1 (tidak bermanfaat)** sampai **5 (sangat bermanfaat)**, boleh menambah s
   rata-rata hanya ada di tab Arsip & Ekspor dan Excel.
 - Penilaian butuh daftar peserta Liga Inovasi dan aplikasi yang dibuka lewat `ORBIT-execute.bat`.
 
+
+## 17. Arsip Transkrip & Mengumpulkan dari Semua Laptop
+
+**Tidak ada transkrip yang hilang.** Setiap catatan — notulen Mode Standar maupun masalah, tanggapan,
+dan kesimpulan di forum Mode Gamifikasi — otomatis tersalin ke folder **`arsip-transkrip`** di dalam
+folder ORBIT laptop itu, satu berkas per sesi. Tidak perlu menekan apa pun.
+
+- **Ikut ke folder bersama.** Bila folder **ORBIT-Bersama** (yang sama dengan ingatan koreksi dikte) sudah
+  tersambung, salinannya ikut ke `ORBIT-Bersama/Transkrip/<nama laptop>/`. Tiap laptop hanya mengisi
+  subfoldernya sendiri, jadi tidak ada berkas yang saling menimpa.
+- **Hapus tidak benar-benar menghapus.** Di Mode Standar, sesi/catatan yang dihapus masuk *Tempat Sampah*
+  (bisa dipulihkan). Di Mode Gamifikasi, *Mulai kelas baru*, *Muat berkas*, dan *Data Contoh* menyimpan
+  transkrip kelas lama ke arsip lebih dulu. Bila sebuah sesi tiba-tiba berisi lebih sedikit catatan
+  (mis. masalah dihapus), versi sebelumnya disimpan di `arsip-transkrip/riwayat/`.
+- **Update aman.** Pembaruan (Ctrl+Shift+U / ORBIT-execute.bat) hanya mengganti berkas aplikasi —
+  folder `arsip-transkrip` tidak pernah disentuh.
+- **Status & tombol:** roda gigi (Setelan) → *Arsip Transkrip*: jumlah sesi yang terarsip, *Buka folder
+  arsip*, *Buka folder bersama*, *Semua transkrip (Excel)*.
+
+**Untuk koordinator — mengumpulkan transkrip semua PTP:**
+
+1. Pastikan semua laptop PTP tersambung ke folder ORBIT-Bersama (Setelan → bagian *Ingatan Koreksi Dikte · Bersama*).
+2. Di laptop koordinator: Setelan → **Semua transkrip (Excel)**. Satu berkas Excel berisi seluruh ucapan
+   dari semua laptop dan kedua mode (satu baris = satu ucapan: laptop, tanggal, kegiatan, masalah,
+   pembicara, unit, daerah, isi, status), plus lembar *Daftar Sesi*.
+3. Untuk menelusuri notulen laptop lain di dalam aplikasi: Mode Standar → tab *Cari & Arsip* →
+   **Kumpulkan dari semua laptop**. Sesi dari laptop lain bergabung ke pencarian; yang sudah ada tidak ditimpa.
+
+Arsip otomatis butuh ORBIT dibuka lewat `ORBIT-execute.bat`. Dibuka langsung dari berkas HTML,
+data tetap tersimpan di browser tapi tidak masuk folder arsip — pakai *Simpan cadangan* manual.
