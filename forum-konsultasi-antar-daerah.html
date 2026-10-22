@@ -2659,7 +2659,7 @@ const KAMUS_POLA = KAMUS_ISTILAH.map(([benar, ragam]) => [
 function koreksiIstilah(teks){
   let t = teks;
   KAMUS_POLA.forEach(([pola, benar]) => { t = t.replace(pola, benar); });
-  return t;
+  return koreksiInggris(t);
 }
 
 /* ------------------------------------------------------------------
@@ -2795,6 +2795,228 @@ tinggi rendah naik turun luas sempit
 /* Pasangan kata yang lazim di forum pendapatan daerah. Dipakai sebagai
    bukti konteks sejak hari pertama, sebelum ORBIT punya catatan sendiri. */
 const FRASA_DOMAIN = `pajak daerah|retribusi daerah|wajib pajak|wajib retribusi|objek pajak|subjek pajak|nilai jual|jual objek|pendapatan asli|asli daerah|pendapatan daerah|tunggakan pajak|piutang pajak|kendaraan bermotor|pajak kendaraan|balik nama|bahan bakar|pajak restoran|pajak hotel|pajak hiburan|pajak parkir|pajak reklame|pajak air|air tanah|air permukaan|sarang burung|burung walet|mineral bukan|bukan logam|logam dan|dan batuan|penerangan jalan|tenaga listrik|bea perolehan|perolehan hak|hak atas|atas tanah|tanah dan|dan bangunan|pemerintah daerah|pemerintah pusat|kepala daerah|peraturan daerah|badan pendapatan|target pendapatan|realisasi pendapatan|realisasi penerimaan|basis data|data wajib|tindak lanjut|praktik baik|jemput bola|mobil keliling|surat ketetapan|surat tagihan|surat pemberitahuan|tanda terima|nomor objek|zona nilai|nilai tanah|penilaian objek|pemutakhiran data|pendataan ulang|sanksi administrasi|pengurangan pokok|penghapusan sanksi|bagi hasil|dana bagi|dana alokasi|alokasi umum|alokasi khusus|transfer ke|tahun anggaran|tahun lalu|tahun ini|bulan ini|kami di|di daerah|daerah kami|tempat kami|kabupaten kami|kota kami`.split('|');
+
+/* ------------------------------------------------------------------
+   ISTILAH BAHASA INGGRIS — keuangan negara, perpajakan, perbendaharaan,
+   anggaran, tata kelola, dan pelatihan/pendidikan aparatur.
+   Pengenal suara tetap "bertelinga Indonesia" (id-ID), jadi istilah Inggris
+   yang diucapkan ditulisnya dengan ejaan Indonesia: "treasury" -> "tresuri".
+   Tiga lapis, dirancang supaya KATA INDONESIA TIDAK PERNAH ikut terseret:
+     1. Pembetulan hanya untuk ejaan salah-dengar yang SUDAH didaftar di sini
+        (cocok persis, kata utuh) — tidak ada tebak-tebakan mirip-mirip. Ejaan
+        yang ternyata kata Indonesia yang sah dibuang otomatis saat dimuat.
+     2. Istilah Inggris TIDAK dimasukkan ke bank calon pengganti pembetulan
+        konteks, jadi kata Indonesia yang "agak mirip" tidak bisa diubah
+        menjadi istilah Inggris lewat kemiripan ejaan.
+     3. Istilah Inggris yang sudah ditulis benar oleh mesin dianggap kata
+        dikenal, jadi tidak lagi "dibetulkan" keliru ke kata Indonesia.
+   Daftar ejaan di bawah adalah tebakan awal. Yang terlewat dipelajari dari
+   suntingan PTP (ingatan koreksi, dibagi antar-laptop).
+   Bentuk: [istilah benar, [ejaan salah-dengar...]]
+   ------------------------------------------------------------------ */
+const KAMUS_INGGRIS = [
+  // --- anggaran, belanja, kinerja ---
+  ['budget',               ['badjet','bad get','bajit','bagjet']],
+  ['budgeting',            ['badjeting','bajeting','bajiting']],
+  ['budget execution',     ['badjet ekseksyen','bajit ekseksyen','budget ekseksyen']],
+  ['performance-based budgeting', ['performans best badjeting','performans based badjeting','performans beis bajeting']],
+  ['expenditure',          ['ekspenditur','ekspenditer','ikspenditur','ekspendityur']],
+  ['spending review',      ['spending rivyu','spending reviu','spending riviu']],
+  ['value for money',      ['valyu for mani','velyu for mani','fal yu for mani','valyu fo mani']],
+  ['outcome',              ['autkam','aut kam','autkom']],
+  ['output',               ['autput','aut put']],
+  ['KPI',                  ['ka pe i','k p i','ki pi ai','ke pe i','key pe i']],
+  ['OKR',                  ['o ke er','o ka er','o k r']],
+  ['ROI',                  ['ar o ai','r o i','er o ai']],
+  ['monitoring',           ['monitoring','monitoring']],
+  ['evaluation',           ['evaluasyen','evaluesyen','ivaluasyen']],
+  ['implementation',       ['implementasyen','implementesyen']],
+  ['accountability',       ['akuntabiliti','akauntabiliti','akuntabilitiy']],
+  ['good governance',      ['gud gavernans','gud governans','gud gavernan']],
+  ['governance',           ['gavernans','governans','gavernens']],
+  ['stakeholder',          ['stekholder','steikholder','stake holder','stekholdur']],
+  ['stakeholders',         ['stekholders','steikholders','stake holders']],
+  ['roadmap',              ['rodmap','rod map','roud map']],
+  ['framework',            ['frem werk','freimwork','fremwork','frem work']],
+  ['benchmarking',         ['bencmarking','bens marking','benchmarkin']],
+  ['best practice',        ['best praktis','bes praktis','best praktik','bes praktik','bes praktes']],
+  ['lesson learned',       ['leson lernd','lesson lern','leson lern','leson lernt']],
+  ['bottleneck',           ['botolnek','bot ol nek','botel nek']],
+  ['quick win',            ['kuik win','kwik win','kwik wen']],
+  ['pain point',           ['pen poin','pein poin','pain poin']],
+  ['policy paper',         ['polisi peper','polisi pepper','polisi peiper']],
+  ['policy brief',         ['polisi brif','polisi brip']],
+
+  // --- pajak ---
+  ['tax',                  ['taks']],
+  ['tax revenue',          ['taks revenyu','taks reveniu','taks rivenyu']],
+  ['tax ratio',            ['taks rasio','taks rasyo','taks reisio']],
+  ['tax gap',              ['taks gep','taks gap']],
+  ['tax base',             ['taks beis','taks bes']],
+  ['tax compliance',       ['taks komplains','taks kompliens','taks komplaians']],
+  ['tax administration',   ['taks administrasyen','taks administresyen']],
+  ['tax expenditure',      ['taks ekspenditur','taks ekspenditer']],
+  ['tax amnesty',          ['taks amnesti','taks emnesti']],
+  ['tax center',           ['taks senter']],
+  ['taxpayer',             ['taks peyer','taks pe yer','taks payer']],
+  ['withholding tax',      ['widholding taks','wit holding taks','withholding taks']],
+  ['value added tax',      ['velyu eded taks','valyu ade taks','fal yu eded taks']],
+  ['VAT',                  ['vi ei ti','fi ei ti','v a t']],
+  ['transfer pricing',     ['transfer praising','transfer praicing','transfer prising']],
+  ['e-filing',             ['i failing','e failing','ifailing','i filing']],
+  ['compliance',           ['komplains','kompliens','komplaians']],
+  ['revenue',              ['revenyu','reveniu','rivenyu']],
+
+  // --- perbendaharaan, kas, utang, keuangan ---
+  ['treasury',             ['tresuri','trezuri','trejuri','tresury']],
+  ['Treasury Single Account', ['tresuri singel akun','tresuri singel akaun','trejuri singel akun']],
+  ['TSA',                  ['ti es ei','t s a','te es a']],
+  ['cash management',      ['kes manajemen','kesh manajemen','ces manajemen']],
+  ['cash flow',            ['kes flo','kes flow','kesh flou']],
+  ['cash basis',           ['kes beis','kes bes','kesh beis']],
+  ['cash pooling',         ['kes puling','kesh pooling','kes pooling']],
+  ['liquidity',            ['likuiditi','likwiditi','likuidity']],
+  ['debt management',      ['det manajemen','dep manajemen']],
+  ['government securities',['gavernmen sekuriti','gavernmen sekuritis','government sekuriti']],
+  ['payment',              ['peymen','peiment']],
+  ['procurement',          ['prokurmen','prokiurmen','prokyurmen']],
+  ['e-procurement',        ['i prokurmen','e prokurmen','i prokyurmen']],
+  ['financial statement',  ['finansial stetmen','finansial steitmen','finansial statmen']],
+  ['balance sheet',        ['balans syit','balens sit','balans shit']],
+  ['accrual basis',        ['ekrual beis','akrual beis','ekrual bes']],
+  ['going concern',        ['going konsern','gowing konsern']],
+  ['audit trail',          ['odit treil','audit treil','audit tril']],
+  ['risk management',      ['risk manajment','risk manejmen','risk manajemen']],
+  ['risk register',        ['risk rejister','risk registrar']],
+  ['fraud',                ['frod','froud','fraut']],
+  ['whistleblower',        ['wistel blower','wisel blower','wistleblower','wis el blower']],
+  ['whistleblowing system',['wistel blowing sistem','wisel blowing sistem']],
+  ['conflict of interest', ['konflik of interest','konflik of intrest','konflik of interes']],
+  ['asset management',     ['eset manajemen','esset manajemen']],
+  ['fixed asset',          ['fiks eset','fiksd eset','fikst eset']],
+  ['depreciation',         ['deprisiasyen','depresiesyen']],
+  ['public private partnership', ['pablik praivet partnersip','pablik private partnersip','publik praivet partnersip']],
+  ['blended finance',      ['blendid finans','blended finans','blendid fainans']],
+  ['green bond',           ['grin bond','grin bon']],
+  ['sustainable finance',  ['sastainabel finans','sustainabel finans']],
+  ['sustainability',       ['sustainabiliti','sastainabiliti','sustenabiliti']],
+  ['sustainable',          ['sustainabel','sastainabel','sustenabel']],
+  ['ESG',                  ['i es ji','i es gi','e s g']],
+  ['SDGs',                 ['es di ji','s d g s','es di jis','es di gis']],
+  ['GDP',                  ['ji di pi','gi di pi','g d p']],
+  ['inflation',            ['inflasyen','infleisyen']],
+  ['recession',            ['resesyen','risesyen']],
+  ['crowding out',         ['krauding aut','krowding aut','crowding aut']],
+  ['multiplier effect',    ['maltiplaier efek','multiplier efek','maltiplayer efek']],
+  ['exchange rate',        ['eksenj reit','ekschenj reit','eksejn reit','ekschenj rate']],
+  ['interest rate',        ['interes reit','intrest reit','interest reit']],
+  ['balance of payment',   ['balans of peymen','balens of peymen','balans of payment']],
+  ['fiscal',               ['fiskel','fiskol','fisikal']],
+  ['fiscal space',         ['fiskal spes','fiskal speis','fiskel spes']],
+  ['fiscal policy',        ['fiskal polisi','fiskel polisi']],
+
+  // --- layanan & digitalisasi ---
+  ['digital transformation', ['digital transformasyen','digital transformesyen']],
+  ['smart city',           ['smart siti','smart citi','smart sity']],
+  ['big data',             ['big deta','bik deta']],
+  ['database',             ['deta beis','deta bes','data beis']],
+  ['dashboard',            ['desboard','dasboard','dash board']],
+  ['real time',            ['ril taim','real taim','ril time']],
+  ['interoperability',     ['interoperabiliti','interoperabilitiy']],
+  ['API',                  ['ei pi ai','a p i','ei pe ai']],
+  ['user friendly',        ['yuser frendly','yuser frendli','user frendli','yuser friendli']],
+  ['user experience',      ['yuser ekspirians','yuser eksperiens','user ekspirens']],
+  ['one stop service',     ['wan stop servis','wan stop service','one stop servis']],
+  ['single window',        ['singel windo','singel window']],
+  ['service level agreement', ['servis level agrimen','servis level agreement']],
+  ['SLA',                  ['es el ei','s l a']],
+  ['turnaround time',      ['ternaround taim','turn around taim','turnaround taim']],
+  ['customer satisfaction',['kastomer satisfaksyen','kostumer satisfaksyen','kastomer satisfaction']],
+  ['feedback',             ['pidbek','fidbek','fid bek']],
+  ['call center',          ['kol senter','kal senter','kol center']],
+
+  // --- pelatihan, pendidikan, SDM aparatur ---
+  ['training of trainers', ['treining of treiner','treining of trainer','trening of treiner']],
+  ['TOT',                  ['ti o ti','t o t']],
+  ['training',             ['treining']],
+  ['learning management system', ['lerning manajemen sistem','lerning manajmen sistem','lerning management sistem']],
+  ['LMS',                  ['el em es','l m s']],
+  ['e-learning',           ['i lerning','e lerning','ilerning','i learning']],
+  ['blended learning',     ['blendid lerning','blended lerning','blendid learning']],
+  ['hybrid learning',      ['haibrid lerning','hibrid lerning']],
+  ['learning organization',['lerning organisasyen','lerning organaisesyen']],
+  ['capacity building',    ['kapasiti bilding','kepasiti bilding','kapasiti building']],
+  ['capacity development', ['kapasiti development','kepasiti divelopmen']],
+  ['coaching',             ['koching','koaching']],
+  ['counseling',           ['kaunseling','kaunsel ing']],
+  ['talent pool',          ['telen pul','talen pul','talent pul']],
+  ['talent management',    ['telen manajemen','talent manajemen']],
+  ['career path',          ['karir pet','karier pat','kareer pat']],
+  ['succession plan',      ['saksesyen plen','saksesyen plan']],
+  ['onboarding',           ['on bording','on boarding','onbording']],
+  ['flipped classroom',    ['flipt klasrum','flip klasrum','flipd klasrum']],
+  ['case study',           ['kes studi','keis studi','kes stadi']],
+  ['role play',            ['rol plei','role plei','rol ple']],
+  ['icebreaker',           ['ais breker','ice breker','ais bereker']],
+  ['ice breaking',         ['ais breking','ice breking']],
+  ['key takeaways',        ['ki tekeweis','ki teikeways','ki tekeways']],
+  ['takeaway',             ['tekewey','teikewei','tek away']],
+  ['mindset',              ['maindset','maind set','maynset']],
+  ['growth mindset',       ['growt maindset','gros maindset']],
+  ['leadership',           ['lidersip','liderchip','lidership']],
+  ['teamwork',             ['timwork','tim werk','timwerk']],
+  ['team building',        ['tim bilding','tim building']],
+  ['public speaking',      ['pablik spiking','publik spiking','pablik speaking']],
+  ['storytelling',         ['stori teling','story teling','stori telling']],
+  ['design thinking',      ['desain thinking','dizain thinking','desain tingking']],
+  ['agile',                ['ejail','ajail','agail','ejile','ajile']],
+  ['sandbox',              ['sandboks','sand boks','sen dbox']],
+  ['scale up',             ['skeil ap','skel ap','skale ap']],
+  ['upskilling',           ['ap skiling','apskiling','up skiling']],
+  ['reskilling',           ['ri skiling','reskiling']],
+  ['soft skill',           ['sof skil','sop skil','soft skil']],
+  ['hard skill',           ['hard skil','hart skil']],
+  ['public sector',        ['pablik sektor','pablik sektur']],
+  ['civil servant',        ['sivil servan','sipil servant','sivil serven']],
+  ['civil service',        ['sivil servis','sipil servis']],
+  ['human capital',        ['yuman kapital','human kapital','hyuman kapital']],
+  ['human resource',       ['yuman risors','human risors','hyuman risors']],
+];
+
+/* Kata Inggris lain yang lazim terselip, tanpa ejaan salah-dengar yang
+   perlu dibetulkan — cukup supaya tidak dianggap "kata janggal". */
+const ISTILAH_INGGRIS_LAIN = `
+the and for with from this that have will been were what which their there about would could should between through during before after
+under over other these those where when while also more most some such only each every both into upon within without across around among
+against along because since until although however therefore thus hence further than then them they your ours
+government public sector policy program project agency ministry department regional local central national province district city
+finance financial fiscal budget budgeting revenue expenditure treasury audit auditor accounting accountant accountability transparency
+governance compliance regulation regulatory reform reformation digital transformation innovation strategy strategic planning
+performance indicator target outcome output impact result results monitoring evaluation assessment report reporting management manager
+leadership training trainer learning workshop seminar webinar module session class mentor mentoring coaching feedback survey
+data database dashboard system platform application service services customer user users stakeholder partner partnership
+risk control internal external review quality standard procedure process framework model approach method methodology
+`.split(/\s+/).filter(Boolean);
+
+const ENG_KENAL = new Set(ISTILAH_INGGRIS_LAIN);
+KAMUS_INGGRIS.forEach(([b]) => b.toLowerCase().split(/[^a-z]+/).filter(Boolean).forEach(w => ENG_KENAL.add(w)));
+
+/* Ejaan salah-dengar yang seluruhnya kata Indonesia sah dibuang — di sinilah
+   lapis pengaman pertama bekerja. Frasa terpanjang dicocokkan lebih dulu. */
+const KAMUS_POLA_INGGRIS = KAMUS_INGGRIS
+  .map(([benar, ragam]) => [benar, [...new Set(ragam.map(r => r.toLowerCase()))].filter(r =>
+      r !== benar.toLowerCase() && !r.split(/\s+/).every(w => LEKSIKON.has(w)))])
+  .filter(([, ragam]) => ragam.length)
+  .sort((a, b) => Math.max(...b[1].map(r => r.length)) - Math.max(...a[1].map(r => r.length)))
+  .map(([benar, ragam]) => [
+    new RegExp('\\b(?:' + ragam.sort((x, y) => y.length - x.length).map(lolosRegex).join('|') + ')\\b', 'gi'), benar
+  ]);
+
+function koreksiInggris(teks){
+  let t = teks;
+  KAMUS_POLA_INGGRIS.forEach(([pola, benar]) => { t = t.replace(pola, m => samakanHuruf(m, benar)); });
+  return t;
+}
 
 let KK = {ganti:{}, konteks:{}, kenal:{}, tolak:{}, kosa:{}, kosaHapus:{}};
 function muatKK(){
@@ -2983,7 +3205,7 @@ function kosakata(){
 
 function kataDikenal(w, v){
   if(w.length <= 3 || /\d/.test(w)) return true;
-  if(KKe.kenal[w]) return true;
+  if(KKe.kenal[w] || ENG_KENAL.has(w)) return true;
   if(w.includes('-')) return w.split('-').every(x => kataDikenal(x, v));
   if(v.domain.has(w) || (v.frek.get(w) || 0) >= 3) return true;
   return bentukDasar(w).some(x => LEKSIKON.has(x) || v.domain.has(x));
@@ -3214,6 +3436,16 @@ const ISTILAH_ARAH = ['BPHTB','PBB-P2','PBJT','SPTPD','SPPT','NJOP','opsen','Bap
   'Samsat','BPN','OSS','PAD','BUMD','DJP','APKD','Widyaiswara','retribusi daerah',
   'pajak daerah','piutang pajak','wajib pajak','tapping box','pendapatan asli daerah'];
 
+/* Istilah Inggris yang paling khas, dikirim sebagai petunjuk ke mesin suara
+   dengan bobot lebih ringan daripada istilah lokal. SENGAJA tidak digabung ke
+   ISTILAH_ARAH: yang itu ikut menjadi bank calon pengganti pembetulan kata. */
+const ISTILAH_ARAH_INGGRIS = ['treasury','budgeting','expenditure','accountability','governance','stakeholder',
+  'benchmarking','best practice','lesson learned','capacity building','value for money','tax ratio','tax compliance',
+  'tax gap','transfer pricing','cash management','Treasury Single Account','going concern','whistleblower',
+  'conflict of interest','blended learning','e-learning','learning management system','training of trainers',
+  'roadmap','framework','mindset','leadership','coaching','digital transformation','one stop service','single window',
+  'key performance indicator','public sector','human capital','sustainability','interoperability','dashboard'];
+
 let arahKosakataAktif = null;   // null = belum dicoba, true/false = hasil deteksi
 
 function pasangArahKosakata(r){
@@ -3227,7 +3459,7 @@ function pasangArahKosakata(r){
   try{
     // nama daerah yang sudah muncul di sesi ini jauh lebih mungkin disebut lagi
     const daftar = ISTILAH_ARAH.concat([...semuaDaerah().keys()].slice(0, 40));
-    r.phrases = daftar.map(f => new Frasa(f, 2.0));
+    r.phrases = daftar.map(f => new Frasa(f, 2.0)).concat(ISTILAH_ARAH_INGGRIS.map(f => new Frasa(f, 1.2)));
     arahKosakataAktif = true;
   }catch(err){ arahKosakataAktif = false; }
 }
