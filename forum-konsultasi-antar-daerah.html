@@ -3774,7 +3774,32 @@ function pasangDikte(inputId, btnId, opsi){
     setTimeout(()=>{ if(aktif) nyalakanSesi(); }, jeda);
   }
 
-  function mulai(){
+  /* Mikrofon dipegang SATU KALI selama dikte berjalan. Tanpa ini, tiap
+     penyambungan ulang (tiap jeda hening, tiap ~50 detik) membuka mikrofon
+     dari nol — dan di laptop yang izinnya "hanya kali ini", dibuka dari
+     berkas langsung, atau ber-port lain, browser bertanya izin LAGI tiap kali.
+     Selama aliran ini terbuka, izinnya tetap hidup dan tidak ditanya ulang. */
+  let pegangMic = null, memintaMic = false;
+  function lepasMic(){
+    if(pegangMic){ try{ pegangMic.getTracks().forEach(t => t.stop()); }catch(e){} }
+    pegangMic = null;
+  }
+
+  async function mulai(){
+    if(memintaMic) return;              // klik ganda saat dialog izin terbuka
+    if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && !pegangMic){
+      kap.textContent = 'Meminta izin mikrofon…'; kap.classList.add('on');
+      memintaMic = true;
+      try{ pegangMic = await navigator.mediaDevices.getUserMedia({audio:true}); }
+      catch(err){
+        memintaMic = false;
+        const tolak = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
+        henti(tolak ? 'Izin mikrofon ditolak. Aktifkan lewat ikon gembok di address bar.'
+                    : 'Mikrofon tidak terbaca. Periksa colokan dan pengaturan suara Windows.');
+        return;
+      }
+      memintaMic = false;
+    }
     aktif = true;
     gagalBeruntun = 0;
     perluSegar = false; adaSementara = false;
@@ -3807,6 +3832,7 @@ function pasangDikte(inputId, btnId, opsi){
     clearInterval(jaga); jaga = null;
     aktif = false;
     buangSesi();
+    lepasMic();
     btn.classList.remove('dengar');
     if(lbl) lbl.textContent = 'Dikte';
     btn.title = 'Mulai dikte suara';
