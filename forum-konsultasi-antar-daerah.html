@@ -180,7 +180,7 @@ input,textarea,select{font-family:inherit;color:inherit}
   background:var(--surface-2);color:var(--text);border:1px solid var(--line);
   transition:filter .18s var(--ease),background .2s var(--ease),border-color .2s var(--ease),box-shadow .2s var(--ease),transform .12s var(--ease);
 }
-.btn:hover{filter:brightness(1.08)}
+@media (hover:hover){.btn:hover{filter:brightness(1.08)}}
 .btn:active{transform:scale(.96)}
 .btn-primary{background:var(--accent);color:var(--on-accent);border-color:transparent;box-shadow:0 1px 2px rgba(0,0,0,.16)}
 .btn-kirim{background:#34C759;color:#fff;border-color:transparent;box-shadow:0 1px 2px rgba(0,0,0,.16);gap:8px}.btn-kirim:hover{background:#2DB04F}.btn-kirim .kirim-ik{font-size:1.15em;line-height:1;font-weight:700}
@@ -274,7 +274,7 @@ body.wi-active .rail{border-color:var(--accent-2)}
 .rail-step{display:flex;align-items:center;gap:13px;opacity:.38;transition:opacity .45s var(--ease)}
 .rail-step .rn{width:36px;height:36px;flex:none;border-radius:50%;display:grid;place-items:center;
   font-size:14.5px;font-weight:700;border:2px solid var(--line);color:var(--text-dim);
-  transition:all .45s var(--ease)}
+  transition:background-color .45s var(--ease),border-color .45s var(--ease),color .45s var(--ease)}
 .rail-step b{display:block;font-size:15.5px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
 .rail-step i{display:block;font-size:12.5px;font-style:normal;color:var(--text-dim);margin-top:1px;white-space:nowrap}
 .rail-step.done{opacity:.8}
@@ -355,8 +355,8 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
    di SEMUA keadaan fokus (bukan cuma :focus-visible) memastikan itu tidak
    pernah muncul; sorotan pilih tetap lewat drop-shadow kita sendiri. */
 .jaring .nd-klik:focus,.jaring .nd-klik:focus-visible{outline:none}
-.jaring .nd-klik:hover{transform:scale(1.24);
-  filter:drop-shadow(0 4px 10px rgba(0,0,0,.28))}
+@media (hover:hover){.jaring .nd-klik:hover{transform:scale(1.24);
+  filter:drop-shadow(0 4px 10px rgba(0,0,0,.28))}}
 .jaring .nd-klik:focus-visible{transform:scale(1.24);
   filter:drop-shadow(0 0 0 4px var(--accent-soft))}
 .jaring .nd-klik:active{transition-duration:.12s;transform:scale(1.06)}
@@ -454,7 +454,7 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
   transition:transform .2s var(--ease),border-color .2s var(--ease);
   animation:pop .4s var(--ease) both;
 }
-.tl-item:hover{transform:translateX(5px);border-color:var(--accent)}
+@media (hover:hover){.tl-item:hover{transform:translateX(5px);border-color:var(--accent)}}
 .tl-idx{font-size:13px;font-weight:600;color:var(--text-dim);width:28px;flex:none;
   font-variant-numeric:tabular-nums}
 .tl-body{flex:1;min-width:0}
@@ -710,7 +710,7 @@ button.kk-ganti:hover{border-color:var(--accent-2);color:var(--text)}
   padding:14px 24px;border-radius:980px;background:var(--glass);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
   border:1px solid var(--line);
   font-weight:600;font-size:15px;box-shadow:var(--shadow);opacity:0;pointer-events:none;
-  transition:all .35s var(--ease)}
+  transition:opacity .25s cubic-bezier(.23,1,.32,1),transform .25s cubic-bezier(.23,1,.32,1)}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 .toast.aksi.on{pointer-events:auto}
 .toast .toast-btn{margin-left:14px;padding:4px 14px;border-radius:980px;border:1px solid var(--accent);background:transparent;color:var(--accent);font:inherit;font-weight:700;cursor:pointer}
@@ -788,7 +788,7 @@ button.kk-ganti:hover{border-color:var(--accent-2);color:var(--text)}
 /* tombol "Selesai giliran": berdenyut supaya jelas bisa diklik */
 .lg-kolom .btn-selesai{background:var(--liga);color:#fff;border:0;font-weight:600;gap:6px;
   animation:selesaiDenyut 1.8s ease-in-out infinite;transition:transform .15s,filter .15s}
-.lg-kolom .btn-selesai:hover{transform:translateY(-1px) scale(1.04);filter:brightness(1.08);animation-play-state:paused}
+@media (hover:hover){.lg-kolom .btn-selesai:hover{transform:translateY(-1px) scale(1.04);filter:brightness(1.08);animation-play-state:paused}}
 .lg-kolom .btn-selesai:active{transform:scale(.97)}
 @keyframes selesaiDenyut{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--liga) 55%,transparent)}
   60%{box-shadow:0 0 0 9px color-mix(in srgb,var(--liga) 0%,transparent)}}
@@ -986,7 +986,7 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
 .pg-top .jam{margin-left:auto;font-size:22px;font-weight:600;color:var(--text-dim);font-variant-numeric:tabular-nums}
 .pg-alur{display:flex;gap:8px;margin-left:auto}
 .pg-alur span{padding:8px 16px;border-radius:999px;font-size:14px;font-weight:600;color:var(--text-dim);
-  border:1px solid var(--line);transition:all .4s var(--ease)}
+  border:1px solid var(--line);transition:color .4s var(--ease),background-color .4s var(--ease),border-color .4s var(--ease)}
 .pg-alur span.now{color:var(--on-accent);background:var(--accent);border-color:transparent}
 .pg-alur span.now.liga{background:var(--liga);color:var(--on-liga)}
 .pg-alur span.now.wi{background:var(--accent-2);color:var(--on-accent-2)}
@@ -1204,11 +1204,23 @@ body.panggung .wrap,body.panggung .ambient,body.panggung .toast{display:none!imp
 .pg-nilai{display:grid;grid-template-columns:400px minmax(0,1fr);gap:60px;flex:1;align-items:center}
 .pg-nilai .pg-qr{width:400px;height:400px}
 .pg-titik{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px;max-width:900px}
-.pg-titik i{width:26px;height:26px;border-radius:50%;background:var(--surface-2);border:2px solid var(--line);transition:all .5s var(--ease)}
+.pg-titik i{width:26px;height:26px;border-radius:50%;background:var(--surface-2);border:2px solid var(--line);transition:background-color .5s var(--ease),border-color .5s var(--ease),transform .5s var(--ease)}
 .pg-titik i.isi{background:var(--accent-2);border-color:var(--accent-2);transform:scale(1.08)}
 .pg-nl-jml{font-size:96px;font-weight:700;letter-spacing:-.05em;line-height:1;margin-top:26px;font-variant-numeric:tabular-nums}
 .pg-nl-jml small{font-size:34px;color:var(--text-dim);letter-spacing:-.02em}
-</style>
+
+/* ---- Penyempurnaan gaya Emil Kowalski ----
+   1. Fokus papan ketik: cincin biru hanya saat bergerak pakai Tab, tidak
+      muncul saat diklik mouse. :where() membuatnya mudah dikalahkan aturan
+      khusus (mis. titik peta yang punya sorotan sendiri).
+   2. Gerak dikurangi: pengguna yang mematikan animasi di Windows/HP tidak
+      lagi melihat denyut, geser, atau pop — semua langsung ke hasil akhir. */
+:where(button,a,select,summary,[tabindex]):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+body.wi-active :where(button,a,select,summary,[tabindex]):focus-visible{outline-color:var(--accent-2)}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;
+    transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
 </style>
 </head>
 <!-- spellcheck=false diwariskan ke SEMUA kolom isian, termasuk yang dibuat lewat JS

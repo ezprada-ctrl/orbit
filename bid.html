@@ -54,8 +54,12 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
 .kosong{padding:12px;color:var(--text-dim);font-size:14px}
 .hint{font-size:13px;color:var(--text-dim);margin-top:6px;line-height:1.5}
 button{width:100%;margin-top:20px;font:inherit;font-size:17px;font-weight:800;padding:15px;
-  border:none;border-radius:12px;background:var(--accent);color:var(--on-accent);cursor:pointer}
+  border:none;border-radius:12px;background:var(--accent);color:var(--on-accent);cursor:pointer;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:transform .12s cubic-bezier(.23,1,.32,1)}
+button:active:not(:disabled){transform:scale(.97)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 button:disabled{opacity:.5}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 .msg{margin-top:14px;font-size:15px;font-weight:600;line-height:1.5}
 .ok{color:var(--accent-2)}.err{color:var(--danger)}
 .tutup{text-align:center;padding:40px 18px;color:var(--text-dim);font-size:16px;line-height:1.6}
