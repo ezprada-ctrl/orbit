@@ -476,6 +476,18 @@ body.wi-active .rail-line.fill::after{background:var(--accent-2)}
 
 .cta-bar{display:flex;gap:14px;flex-wrap:wrap;margin-top:34px;
   padding-top:26px;border-top:1px solid var(--line)}
+.cta-langkah{align-items:center;margin-top:28px}
+.cta-lbl{flex-basis:100%;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-dim)}
+/* Kotak isian menempel di bawah layar: berapa pun panjang daftar catatannya,
+   PTP tidak perlu menggulir untuk mencatat berikutnya. Saran nama dibuka ke
+   ATAS karena di bawahnya sudah tepi layar. */
+.komposer{position:sticky;bottom:16px;z-index:6;padding:22px 26px;
+  box-shadow:0 1px 2px rgba(0,0,0,.08),0 18px 48px -18px rgba(0,0,0,.35)}
+.komposer .combo-pop{top:auto;bottom:calc(100% + 8px);max-height:min(360px, 50vh)}
+@media (max-height:640px){.komposer{position:static}}
+/* Tombol hapus muncul saat kursor di atas catatan — di layar sentuh tidak
+   ada kursor, jadi tampilkan samar terus-menerus. */
+@media (hover:none){.resp .del,.std-aksi{opacity:.55}}
 /* aksi berikutnya langsung di bawah angka — tidak perlu menggulir di layar 768px */
 .cta-atas{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:0 0 34px}
 
@@ -851,7 +863,29 @@ body.mode-standar #panel{display:none!important}
 .std-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
 .std-bar .field{max-width:440px}
 .std-bar .kanan{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
-#stdTabs .btn.on{border-color:var(--accent);color:var(--accent)}
+/* Tab = kontrol bersegmen, sengaja tidak mirip tombol aksi supaya jelas
+   bahwa ini berpindah bagian, bukan menjalankan sesuatu. */
+.tab-seg{display:inline-flex;gap:4px;padding:4px;margin-bottom:18px;border-radius:14px;
+  background:var(--surface-2);border:1px solid var(--line)}
+.tab-seg button{border:none;background:transparent;color:var(--text-dim);font:inherit;font-size:15px;font-weight:600;
+  min-height:40px;padding:8px 20px;border-radius:10px;cursor:pointer;
+  transition:color .15s var(--ease),background-color .15s var(--ease),box-shadow .15s var(--ease)}
+.tab-seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.18)}
+@media (hover:hover){.tab-seg button:not(.on):hover{color:var(--text)}}
+/* Unduh PDF | Word: satu kelompok, satu kata kerja */
+.seg-grup{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.seg-grup span{padding:0 14px;font-size:14px;font-weight:600;color:var(--text-dim)}
+.seg-grup button{border:none;border-left:1px solid var(--line);background:transparent;color:var(--text);font:inherit;font-size:15px;font-weight:600;
+  min-height:46px;padding:0 18px;cursor:pointer;transition:background-color .15s var(--ease)}
+@media (hover:hover){.seg-grup button:hover{background:var(--surface-2)}}
+.seg-grup button:active{background:var(--surface-2)}
+.std-bar .icon-btn{width:46px;height:46px;font-size:18px;color:var(--text)}
+.btn-teks{border:none;background:none;color:var(--accent);font:inherit;font-size:14.5px;font-weight:600;cursor:pointer;
+  min-height:44px;padding:0 6px;text-decoration:underline;text-underline-offset:3px;text-decoration-color:transparent;
+  transition:text-decoration-color .15s var(--ease)}
+@media (hover:hover){.btn-teks:hover{text-decoration-color:currentColor}}
+.salin-sesi{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.salin-sesi .field{max-width:420px}
 .std-meta{display:grid;grid-template-columns:2fr 1fr 1fr 1.6fr;gap:14px}
 @media (max-width:900px){.std-meta{grid-template-columns:1fr 1fr}}
 .std-card{padding:22px 26px;border-radius:var(--radius);background:var(--surface);
@@ -1487,7 +1521,7 @@ body.wi-active :where(button,a,select,summary,[tabindex]):focus-visible{outline-
     <div id="ligaTg"></div>
     <div class="feed" id="feedTanggapan"></div>
 
-    <div class="card" style="padding:24px 28px">
+    <div class="card komposer">
       <div id="tgLiga"></div>
       <div class="row" id="tgBaris" style="align-items:flex-start">
         <div style="flex:1">
@@ -1522,12 +1556,14 @@ body.wi-active :where(button,a,select,summary,[tabindex]):focus-visible{outline-
         </div>
       </div>
 
-      <div style="margin-top:14px">
     </div>
 
-    <div class="cta-bar">
+    <!-- Langkah berikutnya sengaja dipisah dari kotak isian: tombol "Tambah"
+         (mencatat) tidak boleh bersebelahan dengan tombol pindah langkah. -->
+    <div class="cta-bar cta-langkah">
+      <span class="cta-lbl">Semua tanggapan sudah tercatat? Lanjut ke langkah berikutnya</span>
       <button class="btn btn-wi btn-lg" id="btnAlih" onclick="masukModeWI()">Alihkan ke Widyaiswara untuk Kesimpulan &nbsp;→</button>
-      <button class="btn btn-ghost" onclick="go('dash')">Simpan &amp; kembali ke dashboard</button>
+      <button class="btn btn-ghost" onclick="go('dash')" title="Tanggapan sudah tersimpan otomatis">Kembali ke dashboard</button>
     </div>
   </section>
 
@@ -1628,18 +1664,21 @@ body.wi-active :where(button,a,select,summary,[tabindex]):focus-visible{outline-
        sehingga keduanya membeku utuh selama mode ini dipakai. -->
   <section class="screen" id="scr-std">
     <div class="std-bar">
-      <select class="field" id="stdPilihSesi" onchange="stdBukaSesi(this.value)"></select>
-      <button class="btn btn-ghost" title="Ganti nama sesi ini" onclick="stdGantiNamaSesi()">✎ Ganti Nama</button>
-      <button class="btn btn-primary" onclick="stdSesiBaru()">+ Sesi Baru</button>
+      <select class="field" id="stdPilihSesi" aria-label="Pilih sesi" onchange="stdBukaSesi(this.value)"></select>
+      <button class="icon-btn" title="Ganti nama sesi ini" aria-label="Ganti nama sesi ini" onclick="stdGantiNamaSesi()">✎</button>
+      <button class="btn btn-ghost" onclick="stdSesiBaru()">+ Sesi Baru</button>
       <div class="kanan">
-        <button class="btn" onclick="stdEksporPDF()">⤓&nbsp; Unduh PDF</button>
-        <button class="btn" onclick="stdEksporWord()">⤓&nbsp; Unduh Word</button>
+        <div class="seg-grup" role="group" aria-label="Unduh notulen">
+          <span>⤓ Unduh</span>
+          <button type="button" onclick="stdEksporPDF()">PDF</button>
+          <button type="button" onclick="stdEksporWord()">Word</button>
+        </div>
       </div>
     </div>
-    <div class="lg-tabs" id="stdTabs">
-      <button class="btn btn-ghost" data-t="catat" onclick="stdTab('catat')">Percakapan</button>
-      <button class="btn btn-ghost" data-t="peserta" onclick="stdTab('peserta')">Peserta</button>
-      <button class="btn btn-ghost" data-t="cari" onclick="stdTab('cari')">Cari &amp; Arsip</button>
+    <div class="tab-seg" id="stdTabs" role="tablist" aria-label="Bagian notulen">
+      <button type="button" role="tab" data-t="catat" onclick="stdTab('catat')">Percakapan</button>
+      <button type="button" role="tab" data-t="peserta" onclick="stdTab('peserta')">Peserta</button>
+      <button type="button" role="tab" data-t="cari" onclick="stdTab('cari')">Cari &amp; Arsip</button>
     </div>
 
     <div id="stdCatat">
@@ -1660,7 +1699,7 @@ body.wi-active :where(button,a,select,summary,[tabindex]):focus-visible{outline-
 
       <div class="feed" id="stdFeed"></div>
 
-      <div class="card" style="padding:24px 28px">
+      <div class="card komposer">
         <div class="row" style="align-items:flex-start">
           <div style="flex:1" id="stdPembicaraWadah"></div>
           <div style="flex:2.6">
@@ -6903,7 +6942,10 @@ function renderStd(){
   const s = pastikanSesiStd();
   $id('stdPilihSesi').innerHTML = N.sesi.map(x =>
     `<option value="${x.id}"${x.id===s.id?' selected':''}>${esc(tanggalPendek(x.tanggal) + ' · ' + judulSesiStd(x))}</option>`).join('');
-  $id('stdTabs').querySelectorAll('.btn').forEach(b => b.classList.toggle('on', b.dataset.t === stdTabAktif));
+  $id('stdTabs').querySelectorAll('button').forEach(b => {
+    const on = b.dataset.t === stdTabAktif;
+    b.classList.toggle('on', on); b.setAttribute('aria-selected', on);
+  });
   $id('stdCatat').style.display   = stdTabAktif === 'catat'   ? '' : 'none';
   $id('stdPeserta').style.display = stdTabAktif === 'peserta' ? '' : 'none';
   $id('stdCari').style.display    = stdTabAktif === 'cari'    ? '' : 'none';
@@ -7092,16 +7134,20 @@ function renderPesertaStd(){
         urutan bebas. Kolom lain (mis. NIP, Jabatan) ikut terbaca dan ditampilkan di tabel.
         Nama yang sudah ada tidak digandakan, datanya diperbarui.</p>
       <div class="std-bar" style="margin:0">
-        <button class="btn" onclick="$id('stdBerkasPeserta').click()">Pilih berkas Excel / CSV</button>
+        <button class="btn btn-primary" onclick="$id('stdBerkasPeserta').click()">Pilih berkas Excel / CSV</button>
         <input type="file" id="stdBerkasPeserta" accept=".xlsx,.xls,.csv,.tsv,.txt" style="display:none">
-        ${lain.length ? `<select class="field" id="stdSalinDari" style="max-width:340px">${lain.map(x =>
-          `<option value="${x.id}">${esc(tanggalPendek(x.tanggal) + ' · ' + judulSesiStd(x) + ' (' + x.peserta.length + ' org)')}</option>`).join('')}</select>
-          <button class="btn btn-ghost" onclick="stdSalinPeserta()">Salin peserta dari sesi ini</button>` : ''}
-        <button class="btn btn-ghost" onclick="stdIsiPesertaContoh()" title="Isi 6 peserta contoh untuk coba-coba, tanpa perlu impor Excel dulu">+ Peserta contoh</button>
+        <button class="btn-teks" onclick="stdIsiPesertaContoh()" title="Isi 6 peserta contoh untuk coba-coba, tanpa perlu impor Excel dulu">atau isi peserta contoh</button>
       </div>
       <textarea class="field" id="stdTempelPeserta" rows="3" style="margin-top:12px"
         placeholder="…atau tempel langsung dari Excel (boleh dengan baris judul): Nama, Unit Kerja, Daerah, lalu kolom lain bila ada"></textarea>
       <div class="std-bar" style="margin:10px 0 0"><button class="btn btn-kirim" style="margin-left:auto" onclick="stdTempelPesertaOk()">Tambahkan dari tempelan <span class="kirim-ik">↵</span></button></div>
+      ${lain.length ? `<div class="salin-sesi">
+        <label class="fl" for="stdSalinDari">Kelas yang sama dengan sesi sebelumnya? Salin pesertanya</label>
+        <div class="std-bar" style="margin:0">
+          <select class="field" id="stdSalinDari">${lain.map(x =>
+            `<option value="${x.id}">${esc(tanggalPendek(x.tanggal) + ' · ' + judulSesiStd(x) + ' (' + x.peserta.length + ' org)')}</option>`).join('')}</select>
+          <button class="btn btn-ghost" onclick="stdSalinPeserta()">Salin ke sesi ini</button>
+        </div></div>` : ''}
     </div>
     <div class="std-card">
       <h4>Tambah satu peserta</h4>
