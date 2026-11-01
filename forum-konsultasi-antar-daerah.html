@@ -712,6 +712,9 @@ button.kk-ganti:hover{border-color:var(--accent-2);color:var(--text)}
   font-weight:600;font-size:15px;box-shadow:var(--shadow);opacity:0;pointer-events:none;
   transition:all .35s var(--ease)}
 .toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.aksi.on{pointer-events:auto}
+.toast .toast-btn{margin-left:14px;padding:4px 14px;border-radius:980px;border:1px solid var(--accent);background:transparent;color:var(--accent);font:inherit;font-weight:700;cursor:pointer}
+.toast .toast-btn:hover{background:var(--accent);color:#fff}
 
 /* ---- Update otomatis (Ctrl+Shift+U) ---- */
 .update-ov{position:fixed;inset:0;z-index:90;display:none;place-items:center;
@@ -2198,10 +2201,24 @@ function sorotiKolom(el, pesan){
 
 function toast(msg){
   const el = document.getElementById('toast');
+  el.classList.remove('aksi');
   el.textContent = msg; el.classList.add('on');
   // lama tampil mengikuti panjang kalimat — peringatan 120 huruf tidak terbaca dalam 2 detik
   const lama = Math.max(2400, Math.min(7000, 1200 + String(msg).length * 45));
   clearTimeout(el._t); el._t = setTimeout(()=>el.classList.remove('on'), lama);
+}
+
+/* Toast dengan satu tombol aksi (mis. "Urungkan"). Tampil lebih lama supaya
+   sempat diklik; toast biasa berikutnya otomatis menghapus tombolnya. */
+function toastAksi(msg, label, fn){
+  const el = document.getElementById('toast');
+  el.textContent = msg + ' ';
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'toast-btn'; b.textContent = label;
+  b.onclick = () => { clearTimeout(el._t); el.classList.remove('on', 'aksi'); fn(); };
+  el.appendChild(b);
+  el.classList.add('on', 'aksi');
+  clearTimeout(el._t); el._t = setTimeout(()=>el.classList.remove('on', 'aksi'), 15000);
 }
 
 /* ==================================================================
@@ -7084,7 +7101,8 @@ function renderPesertaStd(){
       </div>
     </div>
     <div class="std-card">
-      <h4>Daftar peserta · ${s.peserta.length} orang</h4>
+      <h4 style="display:flex;align-items:center;gap:12px">Daftar peserta · ${s.peserta.length} orang
+        ${s.peserta.length ? '<button class="btn btn-ghost" style="margin-left:auto" onclick="stdKosongkanPeserta()" title="Hapus semua peserta sekaligus (bisa diurungkan)">Kosongkan daftar</button>' : ''}</h4>
       ${s.peserta.length ? (()=>{ const adaDaerah = s.peserta.some(p => p.daerah), ekstra = kolomTambahanPeserta(s.peserta);
         return `<table class="std-tabel"><thead><tr><th>No</th><th>Nama</th><th>Unit Kerja</th>${adaDaerah ? '<th>Daerah</th>' : ''}${ekstra.map(k => '<th>' + esc(k) + '</th>').join('')}<th>Bicara</th><th></th></tr></thead><tbody>
         ${s.peserta.map((p,i) => `<tr><td>${i+1}</td><td>${esc(p.nama)}</td>
@@ -7107,6 +7125,7 @@ const barisKePesertaStd = rows => bacaTabelPeserta(rows, 'unit');
 function terapkanPesertaStd(baru){
   if(!baru.length){ toast('Tidak ada baris peserta yang terbaca. Kolom: Nama | Unit Kerja | Daerah.'); return; }
   const s = sesiStd();
+  const sebelum = JSON.parse(JSON.stringify(s.peserta));   // untuk "Urungkan"
   let tambah = 0, ubah = 0;
   baru.forEach(p=>{
     const ada = s.peserta.find(x => normal(x.nama) === normal(p.nama));
@@ -7119,7 +7138,28 @@ function terapkanPesertaStd(baru){
     }
   });
   simpanN(); renderPesertaStd();
-  toast(tambah + ' peserta ditambahkan' + (ubah ? ', ' + ubah + ' diperbarui' : '') + ' · total ' + s.peserta.length + '.');
+  toastAksi(tambah + ' peserta ditambahkan' + (ubah ? ', ' + ubah + ' diperbarui' : '') + ' · total ' + s.peserta.length + '.',
+    'Urungkan', () => pulihkanPesertaStd(s.id, sebelum));
+}
+/* Mengembalikan daftar peserta ke keadaan sebelum impor/salin/kosongkan.
+   Peserta yang sudah terlanjur dipakai di catatan percakapan sesudahnya
+   tidak ikut dibuang, supaya catatan itu tidak kehilangan pembicaranya. */
+function pulihkanPesertaStd(sid, sebelum){
+  const s = N.sesi.find(x => x.id === sid); if(!s) return;
+  const dipakai = new Set(s.entri.map(e => e.pid));
+  const idLama = new Set(sebelum.map(p => p.id));
+  const tertinggal = s.peserta.filter(p => !idLama.has(p.id) && dipakai.has(p.id));
+  s.peserta = sebelum.concat(tertinggal);
+  simpanN(); renderPesertaStd();
+  toast('Dikembalikan · ' + s.peserta.length + ' peserta.');
+}
+function stdKosongkanPeserta(){
+  const s = sesiStd(); if(!s.peserta.length) return;
+  if(!confirm('Kosongkan seluruh daftar peserta (' + s.peserta.length + ' orang) di sesi ini?\n\nCatatan percakapan TETAP ada, dengan nama yang sudah tercatat. Tindakan ini masih bisa diurungkan sesaat setelahnya.')) return;
+  const sebelum = JSON.parse(JSON.stringify(s.peserta));
+  s.peserta = [];
+  simpanN(); renderPesertaStd();
+  toastAksi('Daftar peserta dikosongkan.', 'Urungkan', () => pulihkanPesertaStd(s.id, sebelum));
 }
 async function stdImporPeserta(f){
   try{
@@ -7143,6 +7183,7 @@ function stdTambahPeserta(){
 }
 function stdSalinPeserta(){
   const dari = N.sesi.find(x => x.id === $id('stdSalinDari').value); if(!dari) return;
+  if(!confirm('Salin ' + dari.peserta.length + ' peserta dari "' + judulSesiStd(dari) + '" (' + tanggalPendek(dari.tanggal) + ') ke sesi ini?\n\nBisa diurungkan sesaat setelahnya.')) return;
   terapkanPesertaStd(dari.peserta.map(p => ({nama:p.nama, unit:p.unit, daerah:p.daerah || '', extra:{...(p.extra || {})}})));
 }
 /* Peserta contoh — buat coba-coba alur pencatatan tanpa perlu impor Excel
