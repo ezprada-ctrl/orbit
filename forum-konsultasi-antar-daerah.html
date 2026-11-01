@@ -29,7 +29,8 @@
   --font:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif;
 }
 :root[data-theme="dark"]{
-  --bg:#000000;                /* system background, hitam pekat khas macOS/iOS gelap */
+  color-scheme:dark;           /* kontrol bawaan browser (ikon kalender, panah pilihan) ikut terang */
+  --bg:#000000;               /* system background, hitam pekat khas macOS/iOS gelap */
   --surface:#1C1C1E;           /* secondarySystemBackground */
   --surface-2:#2C2C2E;         /* tertiarySystemBackground */
   --line:#38383A;              /* separator */
@@ -48,7 +49,8 @@
   --shadow:0 1px 2px rgba(0,0,0,.55),0 24px 60px -28px rgba(0,0,0,.75);
 }
 :root[data-theme="light"]{
-  --bg:#F5F5F7;                /* systemGroupedBackground */
+  color-scheme:light;
+  --bg:#F5F5F7;               /* systemGroupedBackground */
   --surface:#FFFFFF;
   --surface-2:#F2F2F5;
   --line:#D2D2D7;
