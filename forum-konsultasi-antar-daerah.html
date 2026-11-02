@@ -900,6 +900,14 @@ body.mode-standar #panel{display:none!important}
 .std-aksi{position:absolute;top:10px;right:10px;display:flex;gap:4px;opacity:0;transition:opacity .2s}
 .resp:hover .std-aksi{opacity:1}
 .std-aksi .del{position:static;opacity:1}
+/* Percakapan tercatat diringkas sebaris agar notulis fokus ke kolom dikte; klik untuk membuka lengkap */
+#stdFeed .resp{cursor:pointer;padding:12px 22px}
+#stdFeed .resp:not(.buka) .txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15.5px;color:var(--text-dim);margin-top:3px}
+#stdFeed .resp.buka{padding:18px 22px}
+#stdFeed .resp:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.std-alih{margin-left:auto;background:none;border:0;color:var(--accent);font:inherit;font-size:12.5px;
+  font-weight:600;letter-spacing:0;text-transform:none;cursor:pointer;padding:2px 4px}
+.std-alih:hover{text-decoration:underline}
 .resp.kilat{animation:kilat 1.6s var(--ease)}
 @keyframes kilat{0%,40%{box-shadow:0 0 0 3px var(--accent)}100%{box-shadow:none}}
 .std-tabel{width:100%;border-collapse:collapse;font-size:15px}
@@ -6991,10 +6999,13 @@ function renderFeedStd(){
     feed.innerHTML = '<div class="empty">Belum ada percakapan tercatat. Pilih pembicara, lalu ketik atau dikte isinya di bawah.</div>';
     return;
   }
-  feed.innerHTML = `<div class="blok-judul">Percakapan · ${s.entri.length} catatan<small>urut sesuai waktu dicatat</small></div>`
+  const semuaBuka = s.entri.every(e => stdBuka.has(e.id));
+  feed.innerHTML = `<div class="blok-judul">Percakapan · ${s.entri.length} catatan<small>urut sesuai waktu dicatat · klik catatan untuk melihat lengkap</small>`
+    + `<button class="std-alih" onclick="stdAlihSemua(${!semuaBuka})">${semuaBuka ? 'Ringkas semua' : 'Buka semua'}</button></div>`
     + s.entri.map((e,i)=>{
-      const p = penutur(s, e);
-      return `<div class="resp" id="se-${e.id}">
+      const p = penutur(s, e), buka = stdBuka.has(e.id);
+      return `<div class="resp${buka ? ' buka' : ''}" id="se-${e.id}" tabindex="0" role="button" aria-expanded="${buka}"
+        onclick="stdAlihEntri(event,'${e.id}')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();stdAlihEntri(event,'${e.id}')}">
         <div class="std-aksi">
           <button class="del" title="Ubah catatan" onclick="stdUbahEntri('${e.id}')">✎</button>
           <button class="del" title="Hapus catatan" onclick="stdHapusEntri('${e.id}')">×</button>
@@ -7002,6 +7013,19 @@ function renderFeedStd(){
         <div class="who"><span class="no">${i+1}</span>${esc(p.nama)}${p.unit ? `<span class="unit">· ${esc(p.unit)}</span>` : ''}${e.impor ? '' : `<span class="jam">${jamDari(e.waktu)}</span>`}</div>
         <div class="txt">${esc(e.isi)}</div></div>`;
     }).join('');
+}
+// catatan yang sedang dibuka lengkap — hanya di layar ini, tidak ikut disimpan
+const stdBuka = new Set();
+function stdAlihEntri(ev, eid){
+  if(ev.target.closest('button')) return;
+  if(String(window.getSelection && window.getSelection()).trim()) return; // sedang menyalin teks, jangan dilipat
+  stdBuka.has(eid) ? stdBuka.delete(eid) : stdBuka.add(eid);
+  renderFeedStd();
+  const el = $id('se-' + eid); if(el) el.focus({preventScroll:true});
+}
+function stdAlihSemua(buka){
+  sesiStd().entri.forEach(e => buka ? stdBuka.add(e.id) : stdBuka.delete(e.id));
+  renderFeedStd();
 }
 
 function daftarPembicara(s){
