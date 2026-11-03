@@ -697,6 +697,31 @@ button.kk-ganti:hover{border-color:var(--accent-2);color:var(--text)}
 .kk-saran button:hover{outline:1px solid var(--warn)}
 .kk-saran .kk-x{background:none;color:var(--text-dim);padding:2px 6px}
 .kk-ajar{border-color:var(--accent-2);color:var(--text)}
+/* Stabilo di dalam kolom dikte: lapisan tembus pandang berisi teks yang sama
+   (huruf transparan) menimpa kolom; hanya kata bertanda yang berwarna. */
+.dk-wrap{position:relative}
+.dk-stabilo{position:absolute;pointer-events:none;overflow:hidden;box-sizing:border-box;
+  color:transparent;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;display:none}
+.dk-stabilo.on{display:block}
+.dk-stabilo mark{color:transparent;border-radius:3px}
+.dk-stabilo .stb-ragu{background:rgba(255,204,0,.42)}
+.dk-stabilo .stb-ganti{background:none;box-shadow:inset 0 -2px 0 var(--accent-2)}
+.dk-stabilo .stb-aktif{background:rgba(255,149,0,.55);box-shadow:0 0 0 2px var(--warn)}
+:root[data-theme="dark"] .dk-stabilo .stb-ragu{background:rgba(255,214,10,.32)}
+.dk-wrap.rekam textarea.field{min-height:clamp(140px,26vh,240px)!important}
+@media (max-height:640px){.dk-wrap.rekam textarea.field{min-height:110px!important}}
+.dk-keujung{position:absolute;right:14px;bottom:12px;z-index:2;display:none;
+  font:inherit;font-size:13px;font-weight:600;padding:6px 12px;min-height:32px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--accent);background:var(--surface);color:var(--accent);
+  box-shadow:0 4px 14px -4px rgba(0,0,0,.35)}
+.dk-keujung.on{display:block}
+.kk-nav{display:inline-flex;align-items:center;gap:8px;color:var(--text);font-weight:600;padding:4px 2px}
+.kk-stb{width:14px;height:10px;border-radius:2px;background:rgba(255,204,0,.6)}
+.kk-nav button{font:inherit;cursor:pointer;border:1px solid var(--warn);border-radius:999px;padding:3px 10px;
+  background:var(--warn-soft);color:var(--text)}
+button.kk-q{font:inherit;background:none;border:none;padding:0;cursor:pointer;
+  text-decoration:underline dotted;text-underline-offset:3px}
+@media (hover:hover){.kk-nav button:hover{outline:1px solid var(--warn)}}
 .kk-tawar{border-style:dashed;border-color:var(--accent);color:var(--text);padding-right:4px}
 .kk-tq{color:var(--accent);font-weight:600}
 .kk-tawar button{font:inherit;cursor:pointer;border:none;border-radius:999px;padding:2px 10px}
@@ -3441,13 +3466,17 @@ function pilihTebakan(res){
 
 /** Mengganti satu kata utuh di kolom, memilih kemunculan yang paling dekat
     dengan posisi perkiraan. Posisi kursor PTP dijaga. */
-function gantiDiKolom(field, cari, jadi, kira){
+function posisiKata(teks, cari, kira){
   const re = new RegExp('(^|[^' + HURUF + '])(' + lolosRegex(cari) + ')(?![' + HURUF + '])', 'g');
   let m, terbaik = -1, beda = Infinity;
-  while((m = re.exec(field.value))){
+  while((m = re.exec(teks))){
     const i = m.index + m[1].length, d = Math.abs(i - kira);
     if(d < beda){ beda = d; terbaik = i; }
   }
+  return terbaik;
+}
+function gantiDiKolom(field, cari, jadi, kira){
+  const terbaik = posisiKata(field.value, cari, kira);
   if(terbaik < 0) return false;
   const a = field.selectionStart, b = field.selectionEnd, geser = jadi.length - cari.length;
   field.value = field.value.slice(0, terbaik) + jadi + field.value.slice(terbaik + cari.length);
@@ -3578,10 +3607,29 @@ function pasangDikte(inputId, btnId, opsi){
   let rec = null, aktif = false;
   const lbl = btn.querySelector('.mic-t');
 
+  /* Kolom dibungkus supaya bisa diberi lapisan STABILO di atasnya: kolom
+     isian polos tidak bisa mewarnai satu kata, jadi lapisan tembus pandang
+     dengan teks yang sama persis (huruf transparan) ditaruh menimpa kolom,
+     dan hanya kata yang ditandai yang diberi latar. Klik tetap tembus ke
+     kolom di bawahnya. */
+  const wrap = document.createElement('div');
+  wrap.className = 'dk-wrap';
+  field.insertAdjacentElement('beforebegin', wrap);
+  wrap.appendChild(field);
+  const stabilo = document.createElement('div');
+  stabilo.className = 'dk-stabilo';
+  stabilo.setAttribute('aria-hidden', 'true');
+  wrap.appendChild(stabilo);
+  // muncul saat PTP menggulir ke atas dan teks baru terus masuk di bawah
+  const keUjung = document.createElement('button');
+  keUjung.type = 'button';
+  keUjung.className = 'dk-keujung';
+  wrap.appendChild(keUjung);
+
   // keterangan "sedang didengar", dibuat otomatis di bawah tiap kolom berdikte
   const kap = document.createElement('div');
   kap.className = 'dikte-kap';
-  field.insertAdjacentElement('afterend', kap);
+  wrap.insertAdjacentElement('afterend', kap);
 
   /* Baris koreksi di bawah kolom: kata yang dibetulkan otomatis (klik untuk
      mengembalikan) dan kata yang hanya disarankan (klik saran untuk
@@ -3599,17 +3647,82 @@ function pasangDikte(inputId, btnId, opsi){
     catatanKK = catatanKK.filter(c => c.jenis === 'ajar' ? Date.now() - c.t < 4000
                                     : c.jenis === 'tawar' ? tawar.includes(c)
                                     : adaKata(c.jenis === 'ganti' ? c.ke : c.kata)).slice(-12);
-    bar.innerHTML = catatanKK.map((c, k) =>
+    const nRagu = catatanKK.filter(c => c.jenis === 'saran').length;
+    bar.innerHTML = (nRagu ? `<span class="kk-nav"><span class="kk-stb"></span>${nRagu} kata perlu dicek${nRagu > 1
+        ? `<button type="button" data-lanjut="1" title="Lompat ke kata berstabilo berikutnya di kolom">Berikutnya ↓</button>` : ''}</span>` : '') +
+      catatanKK.map((c, k) =>
       c.jenis === 'ganti'
         ? `<button type="button" class="kk-c kk-ganti" data-k="${k}" title="Dibetulkan otomatis. Klik untuk mengembalikan kata aslinya."><s>${esc(c.dari)}</s> → <b>${esc(c.ke)}</b><span class="kk-u">↶</span></button>`
       : c.jenis === 'saran'
-        ? `<span class="kk-c kk-saran"><span class="kk-q">${esc(c.kata)}?</span>${c.calon.map((x, ci) =>
+        ? `<span class="kk-c kk-saran"><button type="button" class="kk-q" data-k="${k}" data-lompat="1" title="Tunjukkan kata ini di kolom">${esc(c.kata)}?</button>${c.calon.map((x, ci) =>
             `<button type="button" data-k="${k}" data-c="${ci}" title="Ganti dengan kata ini">${esc(x)}</button>`).join('')}<button type="button" class="kk-x" data-k="${k}" data-x="1" title="Kata ini sudah benar, jangan ditandai lagi">×</button></span>`
       : c.jenis === 'tawar'
         ? `<span class="kk-c kk-tawar"><span class="kk-tq">Simpan ke memori?</span>${c.u.dari ? `<s>${esc(c.u.dari)}</s> → <b>${esc(c.u.ke)}</b>` : ''}${c.u.dari && c.u.kosaTampil.length ? ' · ' : ''}${c.u.kosaTampil.length ? `kata baru: <b>${c.u.kosaTampil.map(esc).join(', ')}</b>` : ''}<button type="button" class="kk-ya" data-k="${k}" data-ya="1" title="Ingat untuk dikte berikutnya (juga di laptop lain)">Simpan</button><button type="button" class="kk-x" data-k="${k}" data-x="1" title="Jangan simpan">×</button></span>`
         : `<span class="kk-c kk-ajar">Disimpan ke memori${c.ke ? `: ${esc(c.dari)} → ${esc(c.ke)}` : ''}${c.kosa.length ? `${c.ke ? ' · ' : ': '}${c.kosa.map(esc).join(', ')}` : ''}</span>`
     ).join('');
     bar.classList.toggle('on', catatanKK.length > 0);
+    gambarStabilo();
+  }
+
+  /* ---- Stabilo: menandai di dalam kolom kata yang muncul di baris bawah ----
+     Kuning = kata yang diragukan (perlu dicek PTP); garis bawah = kata yang
+     sudah dibetulkan otomatis. Posisi tiap catatan diperbarui ke kemunculan
+     terdekat, jadi stabilo tetap menempel walau PTP menyunting di depannya. */
+  let teksStabilo = null, sorot = null;   // sorot = catatan yang terakhir dilompati
+  function samakanLapisan(){
+    const cs = getComputedStyle(field);
+    ['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','paddingTop','paddingRight',
+     'paddingBottom','paddingLeft','textIndent','tabSize','wordSpacing'].forEach(p => { stabilo.style[p] = cs[p]; });
+    stabilo.style.left = (field.offsetLeft + field.clientLeft) + 'px';
+    stabilo.style.top = (field.offsetTop + field.clientTop) + 'px';
+    stabilo.style.width = field.clientWidth + 'px';
+    stabilo.style.height = field.clientHeight + 'px';
+    stabilo.scrollTop = field.scrollTop;
+  }
+  function gambarStabilo(){
+    const v = field.value;
+    const tanda = [];
+    catatanKK.forEach(c => {
+      if(c.jenis !== 'saran' && c.jenis !== 'ganti') return;
+      const kata = c.jenis === 'saran' ? c.kata : c.ke;
+      const i = posisiKata(v, kata, c.i || 0);
+      if(i < 0) return;
+      c.i = i;
+      tanda.push({a: i, b: i + kata.length, c});
+    });
+    tanda.sort((x, y) => x.a - y.a);
+    let html = '', pos = 0;
+    tanda.forEach(t => {
+      if(t.a < pos) return;   // tumpang tindih: cukup satu
+      html += esc(v.slice(pos, t.a)) +
+        `<mark class="${t.c.jenis === 'saran' ? 'stb-ragu' : 'stb-ganti'}${t.c === sorot ? ' stb-aktif' : ''}">${esc(v.slice(t.a, t.b))}</mark>`;
+      pos = t.b;
+    });
+    // spasi ekor: baris kosong terakhir kolom ikut terhitung tingginya
+    stabilo.innerHTML = html + esc(v.slice(pos)) + '​';
+    teksStabilo = v;
+    stabilo.classList.toggle('on', tanda.length > 0);
+    samakanLapisan();
+  }
+  field.addEventListener('scroll', () => { stabilo.scrollTop = field.scrollTop; });
+  if(window.ResizeObserver) new ResizeObserver(samakanLapisan).observe(field);
+  // isi kolom bisa diganti kode lain tanpa sinyal (mis. dikosongkan setelah dicatat)
+  setInterval(() => { if(teksStabilo !== null && field.value !== teksStabilo && field.isConnected) segarkanBar(); }, 700);
+
+  /* Membawa PTP ke kata yang ditandai: kolom digulir sampai kata itu
+     terlihat, lalu katanya disorot sehingga tinggal diketik ulang. */
+  function lompatKe(c){
+    const kata = c.jenis === 'saran' ? c.kata : c.ke;
+    const i = posisiKata(field.value, kata, c.i || 0);
+    if(i < 0) return;
+    sorot = c;
+    gambarStabilo();
+    const mk = stabilo.querySelector('.stb-aktif');
+    field.focus({preventScroll: true});
+    field.setSelectionRange(i, i + kata.length);
+    if(mk) field.scrollTop = Math.max(0, mk.offsetTop - field.clientHeight / 3);
+    stabilo.scrollTop = field.scrollTop;
+    cekUjung();
   }
 
   /* Mengamati suntingan manual: cermin = isi kolom terakhir yang sudah
@@ -3667,14 +3780,37 @@ function pasangDikte(inputId, btnId, opsi){
     clearTimeout(tundaAjar);
     tundaAjar = setTimeout(() => pelajariSuntingan(false), 2500);
   });
-  field.addEventListener('blur', () => { if(tundaAjar) pelajariSuntingan(true); ikutiUjung(); });
-  /* Gulir sendiri ke teks terbaru selama dikte, supaya PTP cukup memantau.
-     Jeda selama kursor PTP aktif di kolom (sedang menyunting); begitu kursor
-     keluar dari kolom, kolom kembali menyusul ke ujung. */
-  function ikutiUjung(){
-    if(document.activeElement === field) return;
-    field.scrollTop = field.scrollHeight;
+  field.addEventListener('blur', () => { if(tundaAjar) pelajariSuntingan(true); });
+  /* Gulir sendiri ke teks terbaru selama dikte, supaya PTP cukup memantau —
+     TAPI hanya selama PTP memang sedang di ujung. Begitu PTP menggulir ke
+     atas (roda mouse, seret, atau lompat ke kata berstabilo), kolom diam di
+     tempat PTP membaca; teks baru tetap masuk di bawah dan tombol
+     "Ke teks terbaru" muncul. Kolom menyusul lagi kalau tombol itu diklik
+     atau PTP sendiri menggulir sampai ke dasar. */
+  let ikut = true, kataBaru = 0;
+  const diDasar = () => field.scrollHeight - field.scrollTop - field.clientHeight < 24;
+  function cekUjung(){
+    ikut = diDasar();
+    if(ikut) kataBaru = 0;
+    keUjung.classList.toggle('on', !ikut && kataBaru > 0);
+    keUjung.textContent = '↓ Ke teks terbaru (' + kataBaru + ' kata baru)';
   }
+  field.addEventListener('scroll', () => { if(!jagaGulir) cekUjung(); });
+  let jagaGulir = false;   // gulir oleh aplikasi sendiri tidak dihitung keputusan PTP
+  function ikutiUjung(){
+    if(!ikut) return;
+    jagaGulir = true;
+    field.scrollTop = field.scrollHeight;
+    stabilo.scrollTop = field.scrollTop;
+    requestAnimationFrame(() => { jagaGulir = false; });
+  }
+  keUjung.addEventListener('mousedown', e => e.preventDefault());
+  keUjung.addEventListener('click', () => {
+    ikut = true; kataBaru = 0; sorot = null;
+    keUjung.classList.remove('on');
+    ikutiUjung();
+    gambarStabilo();
+  });
   // Ctrl+Enter menyimpan tanpa meninggalkan kolom — suntingan terakhir dibaca dulu
   field.addEventListener('keydown', e => {
     if(e.key === 'Enter' && (e.ctrlKey || e.metaKey) && tundaAjar) pelajariSuntingan(true);
@@ -3682,11 +3818,21 @@ function pasangDikte(inputId, btnId, opsi){
 
   bar.addEventListener('mousedown', e => e.preventDefault());   // kursor tetap di kolom
   bar.addEventListener('click', e => {
+    if(e.target.closest('button[data-lanjut]')){
+      // kata berstabilo berikutnya menurut urutan di teks, berputar ke awal
+      gambarStabilo();
+      const ragu = catatanKK.filter(c => c.jenis === 'saran').sort((a, b) => a.i - b.i);
+      if(!ragu.length) return;
+      const kini = sorot && ragu.includes(sorot) ? sorot.i : -1;
+      lompatKe(ragu.find(c => c.i > kini) || ragu[0]);
+      return;
+    }
     const t = e.target.closest('button[data-k]');
     if(!t) return;
     if(tundaAjar) pelajariSuntingan(true);
     const c = catatanKK[+t.dataset.k];
     if(!c) return;
+    if(t.dataset.lompat){ lompatKe(c); return; }
     if(c.jenis === 'tawar'){
       catatanKK = catatanKK.filter(x => x !== c);
       if(t.dataset.ya){
@@ -3750,15 +3896,25 @@ function pasangDikte(inputId, btnId, opsi){
     const awalan = kini ? kini + ' ' : '';
     let kk = {teks, ganti: [], saran: []};
     try{ kk = koreksiKonteks(teks, kini, conf || 0); }catch(err){}   // koreksi tak boleh menggagalkan dikte
+    const gulirLama = field.scrollTop;
+    // sedang menyunting di tengah (kursor tidak di ujung) = sedang membaca juga
+    const ikutKini = ikut && (diUjung || document.activeElement !== field);
+    jagaGulir = true;
     field.value = awalan + kk.teks;
     const n = field.value.length;
-    if(diUjung){
+    if(diUjung && ikutKini){
       field.setSelectionRange(n, n);          // mengetik di ujung terasa wajar
     }else{
       // kursor tetap di tempat PTP menaruhnya (dijaga agar tidak melewati batas)
       field.setSelectionRange(Math.min(posA, n), Math.min(posB, n));
     }
-    ikutiUjung();
+    if(ikutKini) ikutiUjung();
+    else{
+      // PTP sedang membaca di atas: tampilan tidak boleh bergeser sedikit pun
+      field.scrollTop = gulirLama;
+      kataBaru += (kk.teks.match(RE_KATA) || []).length;
+      requestAnimationFrame(() => { jagaGulir = false; field.scrollTop = gulirLama; cekUjung(); });
+    }
     kk.ganti.forEach(g => catatanKK.push({jenis:'ganti', dari: g.dari, ke: g.ke, i: awalan.length + g.i}));
     kk.saran.forEach(s => catatanKK.push({jenis:'saran', kata: s.kata, calon: s.calon, i: awalan.length + s.i}));
     kabariBerubah();
@@ -3915,6 +4071,7 @@ function pasangDikte(inputId, btnId, opsi){
     perluSegar = false; adaSementara = false;
     dikteMulai = Date.now();
     btn.classList.add('dengar');
+    wrap.classList.add('rekam');            // kolom dipertinggi selama dikte
     if(lbl) lbl.textContent = 'Merekam…';
     btn.title = 'Berhenti merekam';
     kap.textContent = 'Mendengarkan…  ·  00:00';
@@ -3944,6 +4101,7 @@ function pasangDikte(inputId, btnId, opsi){
     buangSesi();
     lepasMic();
     btn.classList.remove('dengar');
+    wrap.classList.remove('rekam');
     if(lbl) lbl.textContent = 'Dikte';
     btn.title = 'Mulai dikte suara';
     if(pesan){
