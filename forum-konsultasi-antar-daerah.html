@@ -722,6 +722,16 @@ button.kk-ganti:hover{border-color:var(--accent-2);color:var(--text)}
 button.kk-q{font:inherit;background:none;border:none;padding:0;cursor:pointer;
   text-decoration:underline dotted;text-underline-offset:3px}
 @media (hover:hover){.kk-nav button:hover{outline:1px solid var(--warn)}}
+/* Stabilo yang ikut tersimpan: tampil juga di daftar percakapan/tanggapan */
+.resp .txt mark.stb-ragu{background:rgba(255,204,0,.42);color:inherit;border-radius:3px;padding:0 1px}
+:root[data-theme="dark"] .resp .txt mark.stb-ragu{background:rgba(255,214,10,.32)}
+.ragu-lbl{margin-left:10px;font:inherit;font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;
+  padding:2px 9px;border-radius:999px;cursor:pointer;border:1px solid var(--warn);background:var(--warn-soft);color:var(--text)}
+.ragu-ringkas{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:-4px 0 14px;font-size:14px;font-weight:600;color:var(--text)}
+.ragu-ringkas button{font:inherit;font-size:13px;cursor:pointer;border:1px solid var(--warn);border-radius:999px;
+  padding:4px 12px;background:var(--warn-soft);color:var(--text)}
+@media (hover:hover){.ragu-lbl:hover,.ragu-ringkas button:hover{outline:1px solid var(--warn)}}
+#modalBody .dk-wrap textarea.field{min-height:220px}
 .kk-tawar{border-style:dashed;border-color:var(--accent);color:var(--text);padding-right:4px}
 .kk-tq{color:var(--accent);font-weight:600}
 .kk-tawar button{font:inherit;cursor:pointer;border:none;border-radius:999px;padding:2px 10px}
@@ -3597,16 +3607,87 @@ function daerahDariUcapan(teks){
   return null;
 }
 
-function pasangDikte(inputId, btnId, opsi){
-  const o = Object.assign({daerahKe: null}, opsi || {});
-  const btn = document.getElementById(btnId);
-  const field = document.getElementById(inputId);
-  if(!btn || !field) return;
-  if(!SR_API){ btn.style.display = 'none'; return; }
+/* ------------------------------------------------------------------
+   TANDA RAGU YANG IKUT TERSIMPAN
+   Kata berstabilo yang belum diselesaikan saat Catat ditekan disimpan
+   bersama catatannya (field `tanda`), jadi bisa dicek kapan saja lewat
+   jendela Ubah. Catatan lama (sebelum fitur ini) tidak punya `tanda`:
+   teksnya diperiksa ulang. Pembetulan otomatis TIDAK diterapkan diam-diam
+   ke catatan lama — usulannya cukup ditawarkan sebagai saran.
+   ------------------------------------------------------------------ */
+const cacheTanda = new Map();
+function pindaiTanda(teks){
+  if(cacheTanda.has(teks)) return cacheTanda.get(teks);
+  let hasil = [];
+  try{
+    const kk = koreksiKonteks(teks, '', 0);
+    kk.ganti.forEach(x => hasil.push({jenis:'saran', kata: x.dari, calon: [x.ke], i: x.i}));
+    kk.saran.forEach(x => hasil.push({jenis:'saran', kata: x.kata, calon: x.calon, i: x.i}));
+    hasil.forEach(c => { c.i = posisiKata(teks, c.kata, c.i); });
+    hasil = hasil.filter(c => c.i >= 0).sort((a, b) => a.i - b.i);
+  }catch(err){ hasil = []; }
+  if(cacheTanda.size > 400) cacheTanda.clear();
+  cacheTanda.set(teks, hasil);
+  return hasil;
+}
+function tandaCatatan(x){ return Array.isArray(x.tanda) ? x.tanda : pindaiTanda(x.isi || ''); }
+// kata yang sudah dinyatakan benar (× di mana pun) tidak ditandai lagi di catatan mana pun
+function sudahDikenal(w){ w = w.toLowerCase(); return !!((KK.kenal && KK.kenal[w]) || (KKe.kenal && KKe.kenal[w])); }
+function raguTerbuka(x){
+  const isi = x.isi || '';
+  return tandaCatatan(x).filter(c => c.jenis === 'saran' && !sudahDikenal(c.kata) && posisiKata(isi, c.kata, c.i || 0) >= 0);
+}
+function isiBerstabilo(x){
+  const isi = x.isi || '', tanda = [];
+  raguTerbuka(x).forEach(c => { const i = posisiKata(isi, c.kata, c.i || 0); tanda.push({a: i, b: i + c.kata.length}); });
+  tanda.sort((p, q) => p.a - q.a);
+  let html = '', pos = 0;
+  tanda.forEach(t => {
+    if(t.a < pos) return;
+    html += esc(isi.slice(pos, t.a)) + '<mark class="stb-ragu">' + esc(isi.slice(t.a, t.b)) + '</mark>';
+    pos = t.b;
+  });
+  return html + esc(isi.slice(pos));
+}
+function labelRagu(x, aksi){
+  const n = raguTerbuka(x).length;
+  return n ? `<button type="button" class="ragu-lbl" title="Buka untuk dicek" onclick="event.stopPropagation();${aksi}">${n} kata perlu dicek</button>` : '';
+}
+function ringkasRagu(daftar){
+  let kata = 0, catatan = 0, pertama = -1;
+  daftar.forEach((x, i) => { const n = raguTerbuka(x).length; if(n){ kata += n; catatan++; if(pertama < 0) pertama = i; } });
+  return {kata, catatan, pertama};
+}
+function barisRagu(daftar, aksiDari){
+  const r = ringkasRagu(daftar);
+  return r.kata ? `<div class="ragu-ringkas"><span class="kk-stb"></span>${r.kata} kata perlu dicek di ${r.catatan} catatan
+    <button type="button" onclick="${aksiDari(r.pertama)}">Cek sekarang</button></div>` : '';
+}
+// pengingat ringan sebelum mengunduh; stabilo sendiri tidak pernah ikut tercetak
+function ingatRagu(daftar){
+  const r = ringkasRagu(daftar);
+  if(!r.kata) return true;
+  return confirm('Masih ada ' + r.kata + ' kata berstabilo yang belum dicek di ' + r.catatan + ' catatan.\n\n'
+    + 'OK = tetap unduh (stabilo tidak ikut tercetak)\nBatal = cek dulu');
+}
+// jendela Ubah: kolom isi diberi alat periksa yang sama seperti saat dikte
+function pasangPeriksaUbah(idKolom, x){
+  const f = $id(idKolom);
+  const pk = pasangPeriksa(f, {});
+  pk.pasangTanda(tandaCatatan(x).filter(c => c.jenis !== 'saran' || !sudahDikenal(c.kata)));
+  return pk;
+}
 
-  let rec = null, aktif = false;
-  const lbl = btn.querySelector('.mic-t');
-
+/* ------------------------------------------------------------------
+   ALAT PERIKSA KATA
+   Stabilo di dalam kolom + baris saran di bawahnya + gulir yang tidak
+   menyeret PTP. Dipakai kolom dikte (saat pelatihan) dan jendela Ubah
+   catatan (kapan pun sesudahnya). Tanda yang belum diselesaikan bisa
+   diambil (ambilTanda) untuk ikut disimpan bersama catatan, lalu
+   dipasang lagi (pasangTanda) saat catatan itu disunting.
+   ------------------------------------------------------------------ */
+function pasangPeriksa(field, o){
+  o = o || {};
   /* Kolom dibungkus supaya bisa diberi lapisan STABILO di atasnya: kolom
      isian polos tidak bisa mewarnai satu kata, jadi lapisan tembus pandang
      dengan teks yang sama persis (huruf transparan) ditaruh menimpa kolom,
@@ -3626,17 +3707,12 @@ function pasangDikte(inputId, btnId, opsi){
   keUjung.className = 'dk-keujung';
   wrap.appendChild(keUjung);
 
-  // keterangan "sedang didengar", dibuat otomatis di bawah tiap kolom berdikte
-  const kap = document.createElement('div');
-  kap.className = 'dikte-kap';
-  wrap.insertAdjacentElement('afterend', kap);
-
   /* Baris koreksi di bawah kolom: kata yang dibetulkan otomatis (klik untuk
      mengembalikan) dan kata yang hanya disarankan (klik saran untuk
      memakainya, × bila kata itu memang benar). Tampil hanya bila ada isinya. */
   const bar = document.createElement('div');
   bar.className = 'kk-bar';
-  kap.insertAdjacentElement('afterend', bar);
+  wrap.insertAdjacentElement('afterend', bar);
   let catatanKK = [];   // {jenis:'ganti'|'saran'|'ajar', ...}
 
   const adaKataDi = (teks, k) => new RegExp('(^|[^' + HURUF + '])' + lolosRegex(k) + '(?![' + HURUF + '])').test(teks);
@@ -3707,7 +3783,10 @@ function pasangDikte(inputId, btnId, opsi){
   field.addEventListener('scroll', () => { stabilo.scrollTop = field.scrollTop; });
   if(window.ResizeObserver) new ResizeObserver(samakanLapisan).observe(field);
   // isi kolom bisa diganti kode lain tanpa sinyal (mis. dikosongkan setelah dicatat)
-  setInterval(() => { if(teksStabilo !== null && field.value !== teksStabilo && field.isConnected) segarkanBar(); }, 700);
+  const jagaIsi = setInterval(() => {
+    if(!field.isConnected){ clearInterval(jagaIsi); return; }   // jendela Ubah sudah ditutup
+    if(teksStabilo !== null && field.value !== teksStabilo) segarkanBar();
+  }, 700);
 
   /* Membawa PTP ke kata yang ditandai: kolom digulir sampai kata itu
      terlihat, lalu katanya disorot sehingga tinggal diketik ulang. */
@@ -3919,6 +3998,42 @@ function pasangDikte(inputId, btnId, opsi){
     kk.saran.forEach(s => catatanKK.push({jenis:'saran', kata: s.kata, calon: s.calon, i: awalan.length + s.i}));
     kabariBerubah();
   }
+
+
+  /* Tanda yang masih terbuka, dalam bentuk yang bisa disimpan. Posisinya
+     disegarkan dulu ke isi kolom saat ini; kata yang sudah tidak ada dibuang. */
+  function ambilTanda(){
+    gambarStabilo();
+    return catatanKK.filter(c => c.jenis === 'saran' || c.jenis === 'ganti').map(c =>
+      c.jenis === 'saran' ? {jenis:'saran', kata: c.kata, calon: c.calon.slice(), i: c.i}
+                          : {jenis:'ganti', dari: c.dari, ke: c.ke, i: c.i});
+  }
+  function pasangTanda(daftar){
+    catatanKK = (daftar || []).map(c => Object.assign({}, c, c.calon ? {calon: c.calon.slice()} : {}));
+    cermin = field.value;
+    segarkanBar();
+  }
+  const api = {wrap, sisipkan, ambilTanda, pasangTanda};
+  field._periksa = api;
+  return api;
+}
+
+function pasangDikte(inputId, btnId, opsi){
+  const o = Object.assign({daerahKe: null}, opsi || {});
+  const btn = document.getElementById(btnId);
+  const field = document.getElementById(inputId);
+  if(!btn || !field) return;
+  if(!SR_API){ btn.style.display = 'none'; return; }
+
+  let rec = null, aktif = false;
+  const lbl = btn.querySelector('.mic-t');
+  const pk = pasangPeriksa(field, o);
+  const wrap = pk.wrap, sisipkan = pk.sisipkan;
+
+  // keterangan "sedang didengar", dibuat otomatis di bawah tiap kolom berdikte
+  const kap = document.createElement('div');
+  kap.className = 'dikte-kap';
+  wrap.insertAdjacentElement('afterend', kap);
 
   /* ----------------------------------------------------------------
      MENJAGA DIKTE TETAP HIDUP
@@ -4370,15 +4485,18 @@ function renderTanggapan(){
   renderLigaTg();   // Liga Inovasi: jendela bid / pemenang untuk masalah ini
   const feed = document.getElementById('feedTanggapan');
   feed.innerHTML = m.tanggapan.length
-    ? `<div class="blok-judul">Tanggapan Forum · ${m.tanggapan.length} tanggapan<small>catatan semua yang berbicara — bidder maupun bukan</small></div>` :
+    ? `<div class="blok-judul">Tanggapan Forum · ${m.tanggapan.length} tanggapan<small>catatan semua yang berbicara — bidder maupun bukan</small></div>`
+      + barisRagu(m.tanggapan, i => `ubahTanggapan(${i})`) :
     '<div class="empty">Belum ada tanggapan. Catat masukan peserta dari daerah lain di bawah ini.</div>';
   m.tanggapan.forEach((t,i)=>{
     const o = orangDari(t);
     feed.insertAdjacentHTML('beforeend',
-      `<div class="resp"><button class="del" title="Hapus tanggapan" onclick="hapusTanggapan(${i})">×</button>
-       <div class="who">${esc(t.daerah)}${o ? `<span class="unit">· ${esc(o.nama)}</span>` : ''}</div>
+      `<div class="resp"><div class="std-aksi">
+         <button class="del" title="Ubah tanggapan" onclick="ubahTanggapan(${i})">✎</button>
+         <button class="del" title="Hapus tanggapan" onclick="hapusTanggapan(${i})">×</button></div>
+       <div class="who">${esc(t.daerah)}${o ? `<span class="unit">· ${esc(o.nama)}</span>` : ''}${labelRagu(t, `ubahTanggapan(${i})`)}</div>
        ${o && rincianOrang(o) ? `<div class="orang-rinci">${esc(rincianOrang(o))}</div>` : ''}
-       <div class="txt">${esc(t.isi)}</div></div>`);
+       <div class="txt">${isiBerstabilo(t)}</div></div>`);
   });
   siapkanKolomOrang();
 }
@@ -4435,7 +4553,8 @@ function tambahTanggapan(){
     if(pe && samaDaerah(pe.daerah, nama)) orang = {pid:pe.id, orang:snapshotOrang(pe.id)};
   }
   const baru = !semuaDaerah().has(nama);   // cek SEBELUM ditambahkan
-  m.tanggapan.push({daerah:nama, isi:i.value.trim(), ...orang});
+  const tanda = i._periksa ? i._periksa.ambilTanda() : [];   // kata ragu yang belum dicek ikut disimpan
+  m.tanggapan.push({daerah:nama, isi:i.value.trim(), tanda, ...orang});
   simpan();
   ligaTautTanggapan(nama, i.value.trim());   // relasikan ke bid yang sedang giliran bicara
   d.value = ''; i.value = ''; $id('tgNama').value = ''; $id('tgNama').dataset.id = '';
@@ -4443,6 +4562,40 @@ function tambahTanggapan(){
   if(baru && !daerahStandar(nama)) toast('"' + nama + '" tidak dikenali sebagai nama wilayah resmi — tulis lengkap (mis. Kota/Kabupaten ...) supaya tidak terhitung dobel.');
   else if(baru) toast(nama + ' bergabung ke forum.');
   d.focus();  // siap untuk penanggap berikutnya tanpa klik
+}
+
+/* Menyunting isi tanggapan kapan saja, dengan stabilo & saran yang sama
+   seperti saat dikte. Poin jawaban Liga yang tertaut ikut diperbarui. */
+function ubahTanggapan(i){
+  const m = cari(S.aktifId); if(!m) return;
+  const t = m.tanggapan[i]; if(!t) return;
+  $id('modalBody').innerHTML = `
+    <div class="rk-lbl" style="margin-top:0">Ubah tanggapan</div>
+    <div class="orang-rinci" style="margin-top:6px">${esc(t.daerah)}${orangDari(t) ? ' · ' + esc(orangDari(t).nama) : ''}</div>
+    <label class="fl" style="margin-top:12px">Isi tanggapan</label>
+    <textarea class="field" id="utI" rows="10">${esc(t.isi)}</textarea>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button class="btn btn-primary" onclick="simpanUbahTanggapan(${i})">Simpan</button>
+      <button class="btn btn-ghost" style="margin-left:auto" onclick="tutupModal()">Batal</button></div>`;
+  $id('overlay').classList.add('on');
+  pasangPeriksaUbah('utI', t);
+}
+function simpanUbahTanggapan(i){
+  const m = cari(S.aktifId); if(!m) return;
+  const t = m.tanggapan[i]; if(!t) return;
+  const isi = $id('utI').value.trim();
+  if(!isi){ sorotiKolom($id('utI'), 'Isi tanggapan tidak boleh kosong.'); return; }
+  const pk = $id('utI')._periksa;
+  if(pk) t.tanda = pk.ambilTanda();
+  const lama = t.isi;
+  t.isi = isi;
+  const p = putaranUntuk(m.id);
+  if(p && lama !== isi){
+    let ubah = false;
+    p.bids.forEach(b => { const k = (b.jawaban || []).indexOf(lama); if(k >= 0){ b.jawaban[k] = isi; ubah = true; } });
+    if(ubah) simpanLiga();
+  }
+  simpan(); tutupModal(); renderTanggapan();
 }
 
 function hapusTanggapan(i){
@@ -5131,7 +5284,7 @@ function cekSiap(){
 
 /* --- Ekspor 1: risalah lengkap seluruh sesi, dikelompokkan per daerah --- */
 async function exportLengkap(){
-  if(!cekSiap() || !(await pastikanPDF())) return;
+  if(!cekSiap() || !ingatRagu(S.masalah.flatMap(m => m.tanggapan)) || !(await pastikanPDF())) return;
   const tgl = bulanID(tanggalLokal(S.tanggal));
   const ctx = buatDoc('Risalah Forum Konsultasi Antar-Daerah');
   sampul(ctx, 'Risalah Forum\nKonsultasi Antar-Daerah',
@@ -7192,6 +7345,7 @@ function renderFeedStd(){
   const semuaBuka = s.entri.every(e => stdBuka.has(e.id));
   feed.innerHTML = `<div class="blok-judul">Percakapan · ${s.entri.length} catatan<small>urut sesuai waktu dicatat · klik catatan untuk melihat lengkap</small>`
     + `<button class="std-alih" onclick="stdAlihSemua(${!semuaBuka})">${semuaBuka ? 'Ringkas semua' : 'Buka semua'}</button></div>`
+    + barisRagu(s.entri, i => `stdUbahEntri('${s.entri[i].id}')`)
     + s.entri.map((e,i)=>{
       const p = penutur(s, e), buka = stdBuka.has(e.id);
       return `<div class="resp${buka ? ' buka' : ''}" id="se-${e.id}" tabindex="0" role="button" aria-expanded="${buka}"
@@ -7200,8 +7354,8 @@ function renderFeedStd(){
           <button class="del" title="Ubah catatan" onclick="stdUbahEntri('${e.id}')">✎</button>
           <button class="del" title="Hapus catatan" onclick="stdHapusEntri('${e.id}')">×</button>
         </div>
-        <div class="who"><span class="no">${i+1}</span>${esc(p.nama)}${p.unit ? `<span class="unit">· ${esc(p.unit)}</span>` : ''}${e.impor ? '' : `<span class="jam">${jamDari(e.waktu)}</span>`}</div>
-        <div class="txt">${esc(e.isi)}</div></div>`;
+        <div class="who"><span class="no">${i+1}</span>${esc(p.nama)}${p.unit ? `<span class="unit">· ${esc(p.unit)}</span>` : ''}${e.impor ? '' : `<span class="jam">${jamDari(e.waktu)}</span>`}${labelRagu(e, `stdUbahEntri('${e.id}')`)}</div>
+        <div class="txt">${isiBerstabilo(e)}</div></div>`;
     }).join('');
 }
 // catatan yang sedang dibuka lengkap — hanya di layar ini, tidak ikut disimpan
@@ -7256,7 +7410,8 @@ function stdTambahEntri(){
     baru = s.peserta.length > sebelum;
   }
   if(!p){ sorotiKolom(inP, 'Pilih atau ketik nama pembicara.'); return; }
-  s.entri.push({id:idBaru('e'), pid:p.id, nama:p.nama, unit:p.unit, isi, waktu:new Date().toISOString()});
+  const tanda = inI._periksa ? inI._periksa.ambilTanda() : [];   // kata ragu yang belum dicek ikut disimpan
+  s.entri.push({id:idBaru('e'), pid:p.id, nama:p.nama, unit:p.unit, isi, tanda, waktu:new Date().toISOString()});
   simpanN();
   inI.value = '';
   inI.style.height = '';   // kolom yang dibesarkan PTP kembali ke ukuran semula
@@ -7281,11 +7436,12 @@ function stdUbahEntri(eid){
     <select class="field" id="seP">${s.peserta.map(p =>
       `<option value="${p.id}"${p.id===e.pid?' selected':''}>${esc(p.nama + (p.unit ? ' — ' + p.unit : ''))}</option>`).join('')}</select>
     <label class="fl" style="margin-top:12px">Isi pembicaraan</label>
-    <textarea class="field" id="seI" rows="7">${esc(e.isi)}</textarea>
+    <textarea class="field" id="seI" rows="10">${esc(e.isi)}</textarea>
     <div style="display:flex;gap:10px;margin-top:18px">
       <button class="btn btn-primary" onclick="stdSimpanUbah('${eid}')">Simpan</button>
       <button class="btn btn-ghost" style="margin-left:auto" onclick="tutupModal()">Batal</button></div>`;
   $id('overlay').classList.add('on');
+  pasangPeriksaUbah('seI', e);
 }
 function stdSimpanUbah(eid){
   const s = sesiStd(), e = s.entri.find(x => x.id === eid); if(!e) return;
@@ -7293,6 +7449,8 @@ function stdSimpanUbah(eid){
   if(!isi){ sorotiKolom($id('seI'), 'Isi pembicaraan tidak boleh kosong.'); return; }
   const p = s.peserta.find(x => x.id === $id('seP').value);
   if(p){ e.pid = p.id; e.nama = p.nama; e.unit = p.unit; }
+  const pk = $id('seI')._periksa;
+  if(pk) e.tanda = pk.ambilTanda();   // sisa kata yang belum dicek tetap terbawa
   e.isi = isi;
   simpanN(); tutupModal(); renderFeedStd();
 }
@@ -7894,7 +8052,7 @@ function cekSiapStd(s){
 
 async function stdEksporPDF(sid){
   const s = sid ? N.sesi.find(x => x.id === sid) : sesiStd();
-  if(!s || !cekSiapStd(s) || !(await pastikanPDF())) return;
+  if(!s || !cekSiapStd(s) || !ingatRagu(s.entri) || !(await pastikanPDF())) return;
   const judul = judulSesiStd(s), tgl = bulanID(tanggalLokal(s.tanggal));
   const ctx = buatDoc(judul.length > 80 ? judul.slice(0,78) + '…' : judul);
   ctx.kaki = 'Notulen ' + s.jenis;
@@ -7990,7 +8148,7 @@ async function stdEksporPDF(sid){
    gaya) tanpa library tambahan dan tanpa internet. */
 function stdEksporWord(sid){
   const s = sid ? N.sesi.find(x => x.id === sid) : sesiStd();
-  if(!s || !cekSiapStd(s)) return;
+  if(!s || !cekSiapStd(s) || !ingatRagu(s.entri)) return;
   const judul = judulSesiStd(s), stat = statPembicara(s);
   const td = 'style="border:1px solid #bbb;padding:4px 8px;vertical-align:top"';
   const th = 'style="border:1px solid #bbb;padding:4px 8px;background:#1a1c2e;color:#fff;text-align:left"';
