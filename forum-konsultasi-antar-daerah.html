@@ -697,6 +697,11 @@ button.kk-ganti:hover{border-color:var(--accent-2);color:var(--text)}
 .kk-saran button:hover{outline:1px solid var(--warn)}
 .kk-saran .kk-x{background:none;color:var(--text-dim);padding:2px 6px}
 .kk-ajar{border-color:var(--accent-2);color:var(--text)}
+.kk-tawar{border-style:dashed;border-color:var(--accent);color:var(--text);padding-right:4px}
+.kk-tq{color:var(--accent);font-weight:600}
+.kk-tawar button{font:inherit;cursor:pointer;border:none;border-radius:999px;padding:2px 10px}
+.kk-tawar .kk-ya{background:var(--accent);color:#fff;font-weight:600}
+.kk-tawar .kk-x{background:none;color:var(--text-dim);padding:2px 6px}
 /* Peringatan alamat file:// — izin mikrofon tidak tersimpan di sana, sehingga
    Chrome bertanya ulang tiap sesi baru dan tiap pertanyaan memutus rekaman. */
 .notis{display:none;gap:14px;padding:16px 22px;border-radius:var(--radius);
@@ -3451,56 +3456,58 @@ function gantiDiKolom(field, cari, jadi, kira){
   return true;
 }
 
-/** Membaca suntingan manual PTP: bila tepat satu kata diganti dengan kata
-    yang mirip ejaannya, itu salah dengar yang dibetulkan — diingat. */
-function belajarDariSuntingan(lama, baru){
+/** Membaca suntingan manual PTP dan menyusun USULAN untuk diingat —
+    tidak menyimpan apa pun. PTP sendiri yang memutuskan lewat tawaran
+    "Simpan ke memori?" di bawah kolom, jadi penjaga lama (kata harus
+    mirip ejaannya, kata baru tidak boleh mirip kata dikenal) tidak lagi
+    membuang suntingan diam-diam: tiap kata yang dibetulkan PTP ditawarkan.
+    Yang tetap dilewati hanya yang tidak bisa disimpan dengan aman. */
+function usulanDariSuntingan(lama, baru){
   const ta = lama.match(RE_KATA) || [], tb = baru.match(RE_KATA) || [];
   let p = 0;
   while(p < ta.length && p < tb.length && ta[p] === tb[p]) p++;
   let s = 0;
   while(s < ta.length - p && s < tb.length - p && ta[ta.length-1-s] === tb[tb.length-1-s]) s++;
   const A = ta.slice(p, ta.length - s), B = tb.slice(p, tb.length - s);
+  // tempelan/ketikan panjang = menulis, bukan membetulkan kata
+  if(!B.length || A.length > 4 || B.length > 4) return null;
   const v = kosakata();
+  const u = {dari: null, ke: null, prev: '', kosa: []};
 
-  /* Kosakata baru: kata yang PTP tulis sendiri dan belum dikenal langsung
-     diingat, jadi tidak ditandai lagi dan boleh jadi usulan pengganti.
-     Dua penjaga supaya salah ketik PTP tidak ikut diingat: kata yang
-     hanya beda 1–2 huruf dari kata dikenal dilewati, dan tempelan teks
-     panjang (lebih dari 12 kata sekaligus) tidak dipelajari. */
-  const baruKosa = [];
-  if(B.length && B.length <= 12) B.forEach(w0 => {
-    const w = w0.toLowerCase();
-    if(w.length < 4 || /\d/.test(w) || kataDikenal(w, v) || KKe.kosa[w]) return;
-    // singkatan berhuruf kapital semua (SIMPADA) hampir pasti disengaja, bukan salah ketik
-    if(w0 !== w0.toUpperCase() && calonPengganti(w, v).size) return;
-    KK.kosa[w] = Date.now();
-    baruKosa.push(w0);
-  });
-
-  let hasil = null;
   if(A.length === 1 && B.length === 1){
     const a = A[0].toLowerCase(), b = B[0], bl = b.toLowerCase();
-    // kata yang jauh berbeda = PTP mengganti pilihan kata, bukan salah dengar
-    const dekat = jarak(a, bl, 3) <= Math.max(2, Math.floor(a.length / 3)) || bunyi(a) === bunyi(bl);
-    if(a !== bl && a.length >= 3 && b.length >= 4 && dekat
-       && (kataDikenal(bl, v) || /^[A-Z]/.test(b) || KK.kosa[bl])){
+    if(a !== bl && b.length >= 2){
       const prev = p ? ta[p-1].toLowerCase() : '';
-      let ok = true;
-      if(kataDikenal(a, v)){
-        // kata aslinya sah ("pajang"), jadi hanya dibetulkan bila didahului kata yang sama
-        if(prev){
-          const k = prev + ' ' + a;
-          KK.konteks[k] = {ke: b, n: ((KK.konteks[k] || {}).n || 0) + 1, t: Date.now()};
-        }else ok = false;
-      }else{
-        KK.ganti[a] = {ke: b, n: ((KK.ganti[a] || {}).n || 0) + 1, t: Date.now()};
-      }
-      if(ok){ delete KK.tolak[a + '>' + bl]; hasil = {dari: A[0], ke: b}; }
+      const sudah = kataDikenal(a, v)
+        ? prev && KK.konteks[prev + ' ' + a] && KK.konteks[prev + ' ' + a].ke === b
+        : KK.ganti[a] && KK.ganti[a].ke === b;
+      // kata asli yang sah tanpa kata pendahulu tidak bisa diingat dengan aman
+      if(!sudah && (!kataDikenal(a, v) || prev)){ u.dari = A[0]; u.ke = b; u.prev = prev; }
     }
   }
-  if(hasil || baruKosa.length) simpanKK();
-  if(!hasil && !baruKosa.length) return null;
-  return Object.assign({kosa: baruKosa}, hasil || {});
+  B.forEach(w0 => {
+    const w = w0.toLowerCase();
+    if(w.length < 3 || /\d/.test(w) || kataDikenal(w, v) || KK.kosa[w] || KKe.kosa[w]) return;
+    if(!u.kosa.includes(w0)) u.kosa.push(w0);
+  });
+  // kata pengganti yang juga kata baru cukup tampil sekali, tapi tetap ikut dikenal
+  u.kosaTampil = u.kosa.filter(w => !u.ke || w.toLowerCase() !== u.ke.toLowerCase());
+  return (u.dari || u.kosa.length) ? u : null;
+}
+/** Menyimpan usulan yang disetujui PTP ke ingatan koreksi (ikut dibagi antar-laptop). */
+function simpanUsulan(u){
+  u.kosa.forEach(w0 => { KK.kosa[w0.toLowerCase()] = Date.now(); });
+  if(u.dari){
+    const a = u.dari.toLowerCase(), b = u.ke;
+    if(kataDikenal(a, kosakata())){
+      const k = u.prev + ' ' + a;
+      KK.konteks[k] = {ke: b, n: ((KK.konteks[k] || {}).n || 0) + 1, t: Date.now()};
+    }else{
+      KK.ganti[a] = {ke: b, n: ((KK.ganti[a] || {}).n || 0) + 1, t: Date.now()};
+    }
+    delete KK.tolak[a + '>' + b.toLowerCase()];
+  }
+  simpanKK();
 }
 
 /* ------------------------------------------------------------------
@@ -3587,15 +3594,20 @@ function pasangDikte(inputId, btnId, opsi){
   const adaKataDi = (teks, k) => new RegExp('(^|[^' + HURUF + '])' + lolosRegex(k) + '(?![' + HURUF + '])').test(teks);
   const adaKata = k => new RegExp('(^|[^' + HURUF + '])' + lolosRegex(k) + '(?![' + HURUF + '])').test(field.value);
   function segarkanBar(){
-    catatanKK = catatanKK.filter(c => c.jenis === 'ajar' ? Date.now() - c.t < 8000
-                                    : adaKata(c.jenis === 'ganti' ? c.ke : c.kata)).slice(-8);
+    // tawaran simpan bertahan sampai dijawab (juga setelah dicatat), paling banyak 4 terbaru
+    const tawar = catatanKK.filter(c => c.jenis === 'tawar').slice(-4);
+    catatanKK = catatanKK.filter(c => c.jenis === 'ajar' ? Date.now() - c.t < 4000
+                                    : c.jenis === 'tawar' ? tawar.includes(c)
+                                    : adaKata(c.jenis === 'ganti' ? c.ke : c.kata)).slice(-12);
     bar.innerHTML = catatanKK.map((c, k) =>
       c.jenis === 'ganti'
         ? `<button type="button" class="kk-c kk-ganti" data-k="${k}" title="Dibetulkan otomatis. Klik untuk mengembalikan kata aslinya."><s>${esc(c.dari)}</s> → <b>${esc(c.ke)}</b><span class="kk-u">↶</span></button>`
       : c.jenis === 'saran'
         ? `<span class="kk-c kk-saran"><span class="kk-q">${esc(c.kata)}?</span>${c.calon.map((x, ci) =>
             `<button type="button" data-k="${k}" data-c="${ci}" title="Ganti dengan kata ini">${esc(x)}</button>`).join('')}<button type="button" class="kk-x" data-k="${k}" data-x="1" title="Kata ini sudah benar, jangan ditandai lagi">×</button></span>`
-        : `<span class="kk-c kk-ajar">${c.ke ? `Diingat: ${esc(c.dari)} → ${esc(c.ke)}` : ''}${c.ke && c.kosa.length ? ' · ' : ''}${c.kosa.length ? `Kosakata baru: ${c.kosa.map(esc).join(', ')}` : ''}</span>`
+      : c.jenis === 'tawar'
+        ? `<span class="kk-c kk-tawar"><span class="kk-tq">Simpan ke memori?</span>${c.u.dari ? `<s>${esc(c.u.dari)}</s> → <b>${esc(c.u.ke)}</b>` : ''}${c.u.dari && c.u.kosaTampil.length ? ' · ' : ''}${c.u.kosaTampil.length ? `kata baru: <b>${c.u.kosaTampil.map(esc).join(', ')}</b>` : ''}<button type="button" class="kk-ya" data-k="${k}" data-ya="1" title="Ingat untuk dikte berikutnya (juga di laptop lain)">Simpan</button><button type="button" class="kk-x" data-k="${k}" data-x="1" title="Jangan simpan">×</button></span>`
+        : `<span class="kk-c kk-ajar">Disimpan ke memori${c.ke ? `: ${esc(c.dari)} → ${esc(c.ke)}` : ''}${c.kosa.length ? `${c.ke ? ' · ' : ': '}${c.kosa.map(esc).join(', ')}` : ''}</span>`
     ).join('');
     bar.classList.toggle('on', catatanKK.length > 0);
   }
@@ -3626,8 +3638,12 @@ function pasangDikte(inputId, btnId, opsi){
     // PTP mengetik balik kata asli dari pembetulan otomatis = pembetulannya ditolak
     const ditolak = catatanKK.find(c => c.jenis === 'ganti' && !adaKata(c.ke) && adaKata(c.dari));
     if(ditolak){ tolakKoreksi(ditolak); return; }
-    const hasil = belajarDariSuntingan(lama, baru);
-    if(hasil) catatanKK.push({jenis:'ajar', dari: hasil.dari, ke: hasil.ke, kosa: hasil.kosa, t: Date.now()});
+    const u = usulanDariSuntingan(lama, baru);
+    if(u){
+      // usulan lama untuk kata yang sama diganti yang terbaru (PTP mengetik ulang)
+      catatanKK = catatanKK.filter(c => !(c.jenis === 'tawar' && c.u.dari && u.dari && c.u.dari.toLowerCase() === u.dari.toLowerCase()));
+      catatanKK.push({jenis:'tawar', u, t: Date.now()});
+    }
     segarkanBar();
   }
   function tolakKoreksi(c){
@@ -3664,7 +3680,15 @@ function pasangDikte(inputId, btnId, opsi){
     if(tundaAjar) pelajariSuntingan(true);
     const c = catatanKK[+t.dataset.k];
     if(!c) return;
-    if(c.jenis === 'ganti'){
+    if(c.jenis === 'tawar'){
+      catatanKK = catatanKK.filter(x => x !== c);
+      if(t.dataset.ya){
+        simpanUsulan(c.u);
+        catatanKK.push({jenis:'ajar', dari: c.u.dari, ke: c.u.ke, kosa: c.u.kosaTampil, t: Date.now()});
+        setTimeout(segarkanBar, 4100);
+      }
+      segarkanBar();
+    }else if(c.jenis === 'ganti'){
       if(gantiDiKolom(field, c.ke, c.dari, c.i)){ kabariBerubah(); tolakKoreksi(c); }
     }else if(c.jenis === 'saran'){
       if(t.dataset.x){
