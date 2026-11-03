@@ -7101,6 +7101,8 @@ function stdTambahEntri(){
   s.entri.push({id:idBaru('e'), pid:p.id, nama:p.nama, unit:p.unit, isi, waktu:new Date().toISOString()});
   simpanN();
   inI.value = '';
+  inI.style.height = '';   // kolom yang dibesarkan PTP kembali ke ukuran semula
+  inI.dispatchEvent(new Event('input', {bubbles: true}));   // saran kata milik teks lama ikut hilang
   renderFeedStd();
   if(baru){ renderPembicara(); toast(p.nama + ' ditambahkan ke daftar peserta' + (p.unit ? '.' : ' — unit kerjanya bisa dilengkapi di tab Peserta.')); }
   // pembicara dibiarkan terpilih: ucapan panjang biasanya didikte beberapa potong
