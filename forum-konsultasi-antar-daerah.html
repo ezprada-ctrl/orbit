@@ -3667,7 +3667,14 @@ function pasangDikte(inputId, btnId, opsi){
     clearTimeout(tundaAjar);
     tundaAjar = setTimeout(() => pelajariSuntingan(false), 2500);
   });
-  field.addEventListener('blur', () => { if(tundaAjar) pelajariSuntingan(true); });
+  field.addEventListener('blur', () => { if(tundaAjar) pelajariSuntingan(true); ikutiUjung(); });
+  /* Gulir sendiri ke teks terbaru selama dikte, supaya PTP cukup memantau.
+     Jeda selama kursor PTP aktif di kolom (sedang menyunting); begitu kursor
+     keluar dari kolom, kolom kembali menyusul ke ujung. */
+  function ikutiUjung(){
+    if(document.activeElement === field) return;
+    field.scrollTop = field.scrollHeight;
+  }
   // Ctrl+Enter menyimpan tanpa meninggalkan kolom — suntingan terakhir dibaca dulu
   field.addEventListener('keydown', e => {
     if(e.key === 'Enter' && (e.ctrlKey || e.metaKey) && tundaAjar) pelajariSuntingan(true);
@@ -3751,6 +3758,7 @@ function pasangDikte(inputId, btnId, opsi){
       // kursor tetap di tempat PTP menaruhnya (dijaga agar tidak melewati batas)
       field.setSelectionRange(Math.min(posA, n), Math.min(posB, n));
     }
+    ikutiUjung();
     kk.ganti.forEach(g => catatanKK.push({jenis:'ganti', dari: g.dari, ke: g.ke, i: awalan.length + g.i}));
     kk.saran.forEach(s => catatanKK.push({jenis:'saran', kata: s.kata, calon: s.calon, i: awalan.length + s.i}));
     kabariBerubah();
