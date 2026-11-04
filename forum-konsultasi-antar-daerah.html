@@ -1657,6 +1657,7 @@ body.wi-active :where(button,a,select,summary,[tabindex]):focus-visible{outline-
 
     <div class="export-bar">
       <button class="btn btn-primary" onclick="exportLengkap()">⤓&nbsp; Unduh Risalah Lengkap (PDF)</button>
+      <button class="btn" onclick="forumUnduhTeks()" title="Teks polos (.txt), cocok untuk diolah AI">⤓&nbsp; Unduh Risalah (Teks)</button>
       <div style="width:1px;height:38px;background:var(--line);flex:none"></div>
       <select class="field" id="selDaerah" style="max-width:280px"></select>
       <button class="btn" onclick="exportPerDaerah()">⤓&nbsp; Unduh Rekap per Daerah (PDF)</button>
@@ -1692,6 +1693,7 @@ body.wi-active :where(button,a,select,summary,[tabindex]):focus-visible{outline-
 
     <div class="cta-bar">
       <button class="btn btn-wi btn-lg" onclick="exportLengkap()">⤓&nbsp; Unduh Risalah Lengkap (PDF)</button>
+      <button class="btn btn-ghost" onclick="forumUnduhTeks()" title="Teks polos (.txt), cocok untuk diolah AI">⤓&nbsp; Unduh Risalah (Teks)</button>
       <button class="btn btn-lg" onclick="bukaRekap()">Rekap per Daerah →</button>
       <button class="btn btn-ghost" style="margin-left:auto" onclick="keDashboard()">Kembali ke Dashboard</button>
     </div>
@@ -1722,6 +1724,7 @@ body.wi-active :where(button,a,select,summary,[tabindex]):focus-visible{outline-
           <span>⤓ Unduh</span>
           <button type="button" onclick="stdEksporPDF()">PDF</button>
           <button type="button" onclick="stdEksporWord()">Word</button>
+          <button type="button" onclick="stdUnduhTeks()" title="Berkas teks polos (.txt) — paling mudah diberikan ke AI">Teks</button>
         </div>
       </div>
     </div>
@@ -7681,12 +7684,14 @@ function renderCariStd(){
         <td class="aksi"><button class="btn btn-ghost" onclick="stdBukaSesi('${x.id}')">Buka</button>
         <button class="btn btn-ghost" onclick="stdEksporPDF('${x.id}')">PDF</button>
         <button class="btn btn-ghost" onclick="stdEksporWord('${x.id}')">Word</button>
+        <button class="btn btn-ghost" onclick="stdUnduhTeks('${x.id}')" title="Teks polos (.txt), cocok untuk diolah AI">Teks</button>
         <button class="btn btn-ghost" onclick="stdHapusSesi('${x.id}')">Hapus</button></td></tr>`).join('')}
       </tbody></table>
       <div id="stdStatusArsip" class="arsip-status">${teksStatusArsip()}</div>
       <div class="std-bar" style="margin:0;flex-wrap:wrap">
         <button class="btn" onclick="kumpulkanSemuaLaptop(this)">⇣ Kumpulkan dari semua laptop</button>
         <button class="btn btn-ghost" onclick="unduhSemuaTranskripExcel(this)" title="Unduh satu berkas Excel berisi catatan semua sesi dari laptop ini DAN laptop lain yang tersambung ke folder bersama (kolom Laptop menunjukkan asalnya). Laptop yang belum tersambung belum ikut.">⤓ Semua transkrip (Excel)</button>
+        <button class="btn btn-ghost" onclick="unduhSemuaTranskripTeks(this)" title="Satu berkas teks polos (.txt) berisi semua sesi dari laptop ini DAN laptop lain yang tersambung ke folder bersama. Cocok untuk diberikan ke AI.">⤓ Semua transkrip (Teks)</button>
         <button class="btn btn-ghost" onclick="stdUnduhCadangan()">⤓ Simpan cadangan (JSON)</button>
         <button class="btn btn-ghost" onclick="$id('stdBerkasCadangan').click()">⤒ Muat cadangan</button>
         <input type="file" id="stdBerkasCadangan" accept=".json,application/json" style="display:none">
@@ -7912,12 +7917,11 @@ async function kumpulkanSemuaLaptop(btn){
     : 'Belum ada transkrip dari laptop lain di folder bersama.');
 }
 
-/* Satu tabel datar untuk diolah lanjut: satu baris = satu ucapan, dari semua laptop & kedua mode. */
-async function unduhSemuaTranskripExcel(btn){
+async function kumpulkanTranskripUnik(btn){
   if(btn) btn.disabled = true;
   const d = location.protocol === 'file:' ? null : await ambilSemuaTranskrip();
   if(btn) btn.disabled = false;
-  if(!d && location.protocol !== 'file:') return;
+  if(!d && location.protocol !== 'file:') return null;
   // tanpa server (file://): cukup data di browser ini
   const daftar = d ? d.transkrip : N.sesi.concat(N.sampah || []).map(s => ({jenis:'standar', data:s}))
     .concat(!S.contoh && S.masalah.length ? [{jenis:'forum', data:Object.assign({}, S, {id:S.id || 'forum'})}] : []);
@@ -7931,6 +7935,13 @@ async function unduhSemuaTranskripExcel(btn){
     if(t.jenis === 'standar') gabungkanSesiStd(rapikanSesiStd(lama.data), rapikanSesiStd(t.data));
     else if(jumlahCatatanForum(t.data) > jumlahCatatanForum(lama.data)) lama.data = t.data;
   });
+  return unik;
+}
+
+/* Satu tabel datar untuk diolah lanjut: satu baris = satu ucapan, dari semua laptop & kedua mode. */
+async function unduhSemuaTranskripExcel(btn){
+  const unik = await kumpulkanTranskripUnik(btn);
+  if(!unik) return;
   const baris = [['Laptop', 'Mode', 'Tanggal', 'Kegiatan / Kelas', 'Masalah', 'No', 'Jenis Catatan', 'Pembicara', 'Unit Kerja / Jabatan', 'Daerah', 'Isi', 'Waktu', 'Status']];
   const sesiRingkas = [['Laptop', 'Mode', 'Tanggal', 'Kegiatan / Kelas', 'Jumlah Catatan', 'Status']];
   [...unik.values()].sort((a, b) => (a.data.tanggal || '').localeCompare(b.data.tanggal || '')).forEach(u=>{
@@ -7968,6 +7979,117 @@ async function unduhSemuaTranskripExcel(btn){
   lembar(sesiRingkas, 'Daftar Sesi', [22, 11, 11, 40, 15, 16]);
   XLSX.writeFile(wb, 'transkrip-semua-laptop-' + hariIni() + '.xlsx');
   toast('Excel diunduh: ' + (baris.length - 1) + ' catatan dari ' + (sesiRingkas.length - 1) + ' sesi.');
+}
+
+/* ---------- Unduhan teks polos (.txt) — untuk diolah AI atau dibaca di Notepad ----------
+   Tanpa pemformatan apa pun: judul, peserta, lalu catatan bernomor berlabel
+   pembicara. Kata yang masih berstabilo ditulis [?kata] supaya AI tahu bagian
+   itu meragukan. Catatan di Tempat Sampah tidak ikut. */
+const CATATAN_TANDA = 'CATATAN: transkrip ini hasil dikte suara. Kata dalam tanda [?...] diragukan ejaannya dan belum dicek manusia.';
+function isiTeksTanda(x){
+  const isi = x.isi || '', tanda = [];
+  raguTerbuka(x).forEach(c => { const i = posisiKata(isi, c.kata, c.i || 0); tanda.push({a: i, b: i + c.kata.length}); });
+  tanda.sort((p, q) => p.a - q.a);
+  let out = '', pos = 0;
+  tanda.forEach(t => {
+    if(t.a < pos) return;
+    out += isi.slice(pos, t.a) + '[?' + isi.slice(t.a, t.b) + ']';
+    pos = t.b;
+  });
+  return out + isi.slice(pos);
+}
+function slugTeks(t){ return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50) || 'tanpa-judul'; }
+function tglPanjang(t){ try{ return bulanID(tanggalLokal(t)); }catch(e){ return t || ''; } }
+function namaJabatan(o){ return o ? [o.nama, o.jabatan || o.unit].filter(Boolean).join(', ') : ''; }
+
+function teksSesiStd(s, laptop){
+  rapikanSesiStd(s);
+  let ada = false;
+  const isi = s.entri.map(e => { const t = isiTeksTanda(e); if(t.includes('[?')) ada = true; return t; });
+  const b = ['NOTULEN: ' + judulSesiStd(s), 'Tanggal: ' + tglPanjang(s.tanggal), 'Jenis: ' + s.jenis];
+  if(s.tempat) b.push('Tempat: ' + s.tempat);
+  if(laptop) b.push('Laptop asal: ' + laptop);
+  b.push('Jumlah catatan: ' + s.entri.length, '');
+  if(ada) b.push(CATATAN_TANDA, '');
+  if(s.peserta.length){
+    b.push('PESERTA');
+    s.peserta.forEach(p => b.push('- ' + p.nama + (p.unit || p.daerah ? ' (' + (p.unit || p.daerah) + ')' : '')));
+    b.push('');
+  }
+  b.push('PERCAKAPAN', '');
+  s.entri.forEach((e, k) => {
+    const p = penutur(s, e);
+    b.push('[' + (k + 1) + '] ' + p.nama + (p.unit ? ' (' + p.unit + ')' : '') + (e.impor || !e.waktu ? '' : ', ' + jamDari(e.waktu)) + ':', isi[k], '');
+  });
+  return {teks: b.join('\n'), ada};
+}
+
+function teksForum(d, laptop){
+  const masalah = d.masalah || [];
+  let ada = false, no = 0;
+  const body = [];
+  masalah.forEach((m, n) => {
+    const o = orangDari(m);
+    body.push('MASALAH ' + (n + 1) + ': ' + (m.judul || '(tanpa judul)'));
+    body.push('Diangkat oleh: ' + m.daerah + (o ? ' — ' + namaJabatan(o) : ''));
+    if(m.deskripsi) body.push('Uraian: ' + m.deskripsi);
+    body.push('');
+    if((m.tanggapan || []).length){
+      body.push('TANGGAPAN', '');
+      m.tanggapan.forEach((t, k) => {
+        const ot = orangDari(t), isi = isiTeksTanda(t);
+        if(isi.includes('[?')) ada = true;
+        body.push('[' + (k + 1) + '] ' + t.daerah + (ot ? ' — ' + namaJabatan(ot) : '') + ':', isi, '');
+        no++;
+      });
+    }else body.push('(Belum ada tanggapan.)', '');
+    if(m.kesimpulan) body.push('KESIMPULAN WIDYAISWARA:', m.kesimpulan, '');
+    body.push('-'.repeat(60), '');
+  });
+  const b = ['RISALAH FORUM KONSULTASI ANTAR-DAERAH', 'Kegiatan: ' + (d.kelas || 'Forum Konsultasi'), 'Tanggal: ' + tglPanjang(d.tanggal)];
+  if(laptop) b.push('Laptop asal: ' + laptop);
+  b.push('Jumlah masalah: ' + masalah.length, 'Jumlah tanggapan: ' + masalah.reduce((a, m) => a + (m.tanggapan || []).length, 0), '');
+  if(ada) b.push(CATATAN_TANDA, '');
+  return {teks: b.concat(body).join('\n'), ada};
+}
+
+function unduhTeks(isi, nama){ unduhBlob(new Blob([isi], {type:'text/plain;charset=utf-8'}), nama); }
+function stdUnduhTeks(sid){
+  const s = sid ? N.sesi.find(x => x.id === sid) : sesiStd();
+  if(!s || !cekSiapStd(s)) return;
+  const r = teksSesiStd(s);
+  unduhTeks(r.teks, 'notulen-' + slugTeks(judulSesiStd(s)) + '-' + s.tanggal + '.txt');
+  toast('Teks diunduh.' + (r.ada ? ' Kata bertanda [?…] belum dicek.' : ''));
+}
+function forumUnduhTeks(){
+  if(!cekSiap()) return;
+  const r = teksForum({tanggal: S.tanggal, kelas: S.kelas, masalah: S.masalah});
+  unduhTeks(r.teks, 'risalah-forum-' + S.tanggal + '.txt');
+  toast('Teks diunduh.' + (r.ada ? ' Kata bertanda [?…] belum dicek.' : ''));
+}
+async function unduhSemuaTranskripTeks(btn){
+  const unik = await kumpulkanTranskripUnik(btn);
+  if(!unik) return;
+  const potongan = [];
+  [...unik.values()].sort((a, b) => (a.data.tanggal || '').localeCompare(b.data.tanggal || '')).forEach(u => {
+    const s = u.data;
+    if(u.jenis === 'standar'){
+      if(s.dihapus || !(s.entri || []).length) return;
+      const r = teksSesiStd(s, u.laptop);
+      potongan.push({judul: 'Notulen — ' + judulSesiStd(s) + ' (' + s.tanggal + ')', teks: r.teks, ada: r.ada, n: s.entri.length});
+    }else{
+      if(!jumlahCatatanForum(s)) return;
+      const r = teksForum(s, u.laptop);
+      potongan.push({judul: 'Forum — ' + (s.kelas || 'Forum Konsultasi') + ' (' + s.tanggal + ')', teks: r.teks, ada: r.ada, n: jumlahCatatanForum(s)});
+    }
+  });
+  if(!potongan.length){ toast('Belum ada transkrip yang tersimpan.'); return; }
+  const garis = '\n\n' + '#'.repeat(70) + '\n\n';
+  const kepala = ['KUMPULAN TRANSKRIP ORBIT', 'Diunduh: ' + tglPanjang(hariIni()), 'Jumlah sesi: ' + potongan.length, '']
+    .concat(potongan.some(p => p.ada) ? [CATATAN_TANDA, ''] : [])
+    .concat(['DAFTAR SESI'], potongan.map((p, k) => (k + 1) + '. ' + p.judul + ' — ' + p.n + ' catatan'));
+  unduhTeks(kepala.join('\n') + garis + potongan.map(p => p.teks).join(garis), 'transkrip-semua-' + hariIni() + '.txt');
+  toast('Teks diunduh: ' + potongan.length + ' sesi.');
 }
 
 /* ---------- Tempat Sampah (Mode Standar) ---------- */
@@ -8028,6 +8150,7 @@ async function tampilSetArsip(){
       <button class="btn btn-ghost" onclick="bukaFolderArsip(false)" title="Buka folder di laptop ini tempat semua catatan sesi tersimpan otomatis. Berguna untuk mengecek, menyalin, atau mengirim berkasnya.">Buka folder arsip</button>
       ${st.bersama ? `<button class="btn btn-ghost" onclick="bukaFolderArsip(true)" title="Buka folder bersama yang dipakai semua laptop (lewat OneDrive). Di sini catatan dari laptop rekan juga terkumpul.">Buka folder bersama</button>` : ''}
       <button class="btn btn-ghost" onclick="unduhSemuaTranskripExcel(this)" title="Unduh satu berkas Excel berisi catatan semua sesi dari laptop ini DAN laptop lain yang tersambung ke folder bersama (kolom Laptop menunjukkan asalnya). Laptop yang belum tersambung belum ikut.">Semua transkrip (Excel)</button>
+      <button class="btn btn-ghost" onclick="unduhSemuaTranskripTeks(this)" title="Satu berkas teks polos (.txt) berisi semua sesi dari laptop ini DAN laptop lain yang tersambung ke folder bersama. Cocok untuk diberikan ke AI.">Semua transkrip (Teks)</button>
     </div>`;
 }
 async function bukaFolderArsip(bersama){
