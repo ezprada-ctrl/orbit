@@ -4021,6 +4021,17 @@ function pasangPeriksa(field, o){
   return api;
 }
 
+/* Keadaan izin mikrofon di laptop ini (granted / prompt / denied; kosong bila
+   browser tidak bisa ditanya) dan apakah alamat halamannya layak dipakai
+   mikrofon. Dari berkas (file://) mikrofon bisa jalan, tapi browser tidak
+   mengingat izinnya — itu sumber pertanyaan berulang. */
+let peringatBerkas = false;
+async function periksaIzinMik(){
+  let status = '';
+  try{ if(navigator.permissions && navigator.permissions.query) status = (await navigator.permissions.query({name:'microphone'})).state; }catch(e){}
+  return {status, aman: window.isSecureContext !== false, dariBerkas: location.protocol === 'file:'};
+}
+
 function pasangDikte(inputId, btnId, opsi){
   const o = Object.assign({daerahKe: null}, opsi || {});
   const btn = document.getElementById(btnId);
@@ -4172,17 +4183,42 @@ function pasangDikte(inputId, btnId, opsi){
   async function mulai(){
     if(memintaMic) return;              // klik ganda saat dialog izin terbuka
     if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && !pegangMic){
-      kap.textContent = 'Meminta izin mikrofon…'; kap.classList.add('on');
+      kap.textContent = 'Memeriksa izin mikrofon…'; kap.classList.add('on');
       memintaMic = true;
+      /* Periksa dulu keadaan izin di laptop ini, supaya masalahnya disebut
+         dengan jelas — bukan notifikasi browser yang muncul berulang tanpa
+         penjelasan. */
+      const izin = await periksaIzinMik();
+      if(!izin.aman){
+        memintaMic = false;
+        henti('Alamat halaman ini tidak aman untuk mikrofon. Buka ORBIT lewat ORBIT-execute.bat (alamat localhost:8200).');
+        return;
+      }
+      if(izin.status === 'denied'){
+        memintaMic = false;
+        henti('Mikrofon diblokir untuk ORBIT di browser ini. Klik ikon gembok di address bar → Mikrofon → Izinkan, lalu muat ulang halaman (F5).');
+        return;
+      }
+      if(izin.dariBerkas && !peringatBerkas){
+        peringatBerkas = true;
+        toast('ORBIT dibuka langsung dari berkas — browser bisa menanyakan izin mikrofon berulang. Buka lewat ORBIT-execute.bat.');
+      }
+      kap.textContent = izin.status === 'prompt'
+        ? 'Browser akan meminta izin mikrofon — klik “Izinkan” (pilih “Izinkan saat mengunjungi situs” bila ada, supaya tidak ditanya lagi).'
+        : 'Meminta izin mikrofon…';
       try{ pegangMic = await navigator.mediaDevices.getUserMedia({audio:true}); }
       catch(err){
         memintaMic = false;
         const tolak = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
-        henti(tolak ? 'Izin mikrofon ditolak. Aktifkan lewat ikon gembok di address bar.'
+        henti(tolak ? 'Izin mikrofon ditolak. Klik ikon gembok di address bar → Mikrofon → Izinkan, lalu muat ulang halaman (F5).'
                     : 'Mikrofon tidak terbaca. Periksa colokan dan pengaturan suara Windows.');
         return;
       }
       memintaMic = false;
+      // mikrofon dicabut / diganti di tengah dikte: katakan terus terang, jangan diam-diam mati
+      pegangMic.getAudioTracks().forEach(t => t.addEventListener('ended', () => {
+        if(aktif) henti('Mikrofon terputus (dicabut atau diganti). Periksa colokan, lalu klik Dikte lagi.');
+      }));
     }
     aktif = true;
     gagalBeruntun = 0;
