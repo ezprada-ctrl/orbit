@@ -804,6 +804,10 @@ button.kk-q{font:inherit;background:none;border:none;padding:0;cursor:pointer;
 .blok-judul{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;margin:0 0 10px;
   font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text)}
 .blok-judul small{font-size:12.5px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--text-dim)}
+/* Pemisah hari di daftar percakapan: sesi yang berlangsung beberapa hari tetap mudah dipindai */
+.hari-pemisah{display:flex;align-items:baseline;gap:10px;margin:22px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);
+  font-size:13.5px;font-weight:700;color:var(--text)}
+.hari-pemisah small{font-size:12.5px;font-weight:500;color:var(--text-dim)}
 .lg-card p.lg-sub{color:var(--text-dim);font-size:14.5px;line-height:1.55}
 .lg-grid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:26px;margin-top:14px;align-items:start}
 @media (max-width:900px){.lg-grid{grid-template-columns:1fr}}
@@ -935,7 +939,7 @@ body.mode-standar #panel{display:none!important}
 .std-card h4{font-size:17px;margin-bottom:10px}
 .std-card .sub{color:var(--text-dim);font-size:14px;line-height:1.55;margin-bottom:12px}
 .resp .unit{font-weight:600;color:var(--text-dim);letter-spacing:0;text-transform:none;margin-left:6px}
-.resp .jam{font-weight:600;color:var(--text-dim);letter-spacing:0;margin-left:8px}
+.resp .jam{font-weight:600;color:var(--text-dim);letter-spacing:0;margin-left:8px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .resp .no{color:var(--text-dim);margin-right:8px}
 .std-aksi{position:absolute;top:10px;right:10px;display:flex;gap:4px;opacity:0;transition:opacity .2s}
 .resp:hover .std-aksi{opacity:1}
@@ -7351,6 +7355,18 @@ function tanggalPendek(t){
   catch(e){ return t || ''; }
 }
 function jamDari(iso){ try{ return new Date(iso).toTimeString().slice(0,5); }catch(e){ return ''; } }
+/* Satu sesi bisa mencakup beberapa hari, jadi jam saja tidak cukup:
+   tglJam = "2 Nov 08:27" (tahun ikut bila bukan tahun ini), hariKunci = "2026-11-02". */
+function tglJam(iso){
+  try{
+    const d = new Date(iso); if(isNaN(d)) return '';
+    const o = {day:'numeric', month:'short'};
+    if(d.getFullYear() !== new Date().getFullYear()) o.year = 'numeric';
+    return d.toLocaleDateString('id-ID', o) + ' ' + jamDari(iso);
+  }catch(e){ return ''; }
+}
+function hariKunci(iso){ try{ const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('sv'); }catch(e){ return ''; } }
+function hariPanjang(iso){ try{ return new Date(iso).toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'long', year:'numeric'}); }catch(e){ return ''; } }
 
 function isiMetaStd(s){
   $id('stdJudul').value = s.judul; $id('stdJenis').value = s.jenis;
@@ -7382,18 +7398,26 @@ function renderFeedStd(){
     return;
   }
   const semuaBuka = s.entri.every(e => stdBuka.has(e.id));
+  let hariSebelum = '';
   feed.innerHTML = `<div class="blok-judul">Percakapan · ${s.entri.length} catatan<small>urut sesuai waktu dicatat · klik catatan untuk melihat lengkap</small>`
     + `<button class="std-alih" onclick="stdAlihSemua(${!semuaBuka})">${semuaBuka ? 'Ringkas semua' : 'Buka semua'}</button></div>`
     + barisRagu(s.entri, i => `stdUbahEntri('${s.entri[i].id}')`)
     + s.entri.map((e,i)=>{
       const p = penutur(s, e), buka = stdBuka.has(e.id);
-      return `<div class="resp${buka ? ' buka' : ''}" id="se-${e.id}" tabindex="0" role="button" aria-expanded="${buka}"
+      const hari = e.impor ? '' : hariKunci(e.waktu);
+      let pemisah = '';
+      if(hari && hari !== hariSebelum){
+        const n = s.entri.filter(x => !x.impor && hariKunci(x.waktu) === hari).length;
+        pemisah = `<div class="hari-pemisah"><span>${esc(hariPanjang(e.waktu))}</span><small>${n} catatan</small></div>`;
+      }
+      if(hari) hariSebelum = hari;
+      return pemisah + `<div class="resp${buka ? ' buka' : ''}" id="se-${e.id}" tabindex="0" role="button" aria-expanded="${buka}"
         onclick="stdAlihEntri(event,'${e.id}')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();stdAlihEntri(event,'${e.id}')}">
         <div class="std-aksi">
           <button class="del" title="Ubah catatan" onclick="stdUbahEntri('${e.id}')">✎</button>
           <button class="del" title="Hapus catatan" onclick="stdHapusEntri('${e.id}')">×</button>
         </div>
-        <div class="who"><span class="no">${i+1}</span>${esc(p.nama)}${p.unit ? `<span class="unit">· ${esc(p.unit)}</span>` : ''}${e.impor ? '' : `<span class="jam">${jamDari(e.waktu)}</span>`}${labelRagu(e, `stdUbahEntri('${e.id}')`)}</div>
+        <div class="who"><span class="no">${i+1}</span>${esc(p.nama)}${p.unit ? `<span class="unit">· ${esc(p.unit)}</span>` : ''}${e.impor ? '' : `<span class="jam" title="${esc(hariPanjang(e.waktu))}">${tglJam(e.waktu)}</span>`}${labelRagu(e, `stdUbahEntri('${e.id}')`)}</div>
         <div class="txt">${isiBerstabilo(e)}</div></div>`;
     }).join('');
 }
@@ -8055,7 +8079,7 @@ function teksSesiStd(s, laptop){
   b.push('PERCAKAPAN', '');
   s.entri.forEach((e, k) => {
     const p = penutur(s, e);
-    b.push('[' + (k + 1) + '] ' + p.nama + (p.unit ? ' (' + p.unit + ')' : '') + (e.impor || !e.waktu ? '' : ', ' + jamDari(e.waktu)) + ':', isi[k], '');
+    b.push('[' + (k + 1) + '] ' + p.nama + (p.unit ? ' (' + p.unit + ')' : '') + (e.impor || !e.waktu ? '' : ', ' + hariKunci(e.waktu) + ' ' + jamDari(e.waktu)) + ':', isi[k], '');
   });
   return {teks: b.join('\n'), ada};
 }
@@ -8288,7 +8312,7 @@ async function stdEksporPDF(sid){
     doc.text(p.nama, PDF.M + 10, ctx.y);
     let x = PDF.M + 10 + doc.getTextWidth(p.nama) + 3;
     doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(...PDF.grey);
-    const ekor = [p.unit, e.impor ? '' : jamDari(e.waktu)].filter(Boolean).join('  ·  ');
+    const ekor = [p.unit, e.impor ? '' : tglJam(e.waktu)].filter(Boolean).join('  ·  ');
     if(ekor){
       const sisa = W - PDF.M - x;
       const t = doc.splitTextToSize(ekor, Math.max(20, sisa))[0];
@@ -8329,7 +8353,7 @@ ${s.peserta.map((p,i)=>`<tr><td ${td}>${i+1}</td><td ${td}>${esc(p.nama)}</td><t
 </table>
 <h2>Transkrip Percakapan</h2>
 ${s.entri.map((e,i)=>{ const p = penutur(s, e);
-  return `<p style="margin-top:8pt"><b style="color:#8f6714">${i+1}.</b> <b>${esc(p.nama)}</b> <span class="k">${esc([p.unit, e.impor ? '' : jamDari(e.waktu)].filter(Boolean).join(' · '))}</span></p>
+  return `<p style="margin-top:8pt"><b style="color:#8f6714">${i+1}.</b> <b>${esc(p.nama)}</b> <span class="k">${esc([p.unit, e.impor ? '' : tglJam(e.waktu)].filter(Boolean).join(' · '))}</span></p>
 <p style="margin-left:18pt">${esc(e.isi).replace(/\n/g,'<br>')}</p>`; }).join('\n')}
 </body></html>`;
   unduhBlob(new Blob(['﻿', html], {type:'application/msword'}),
