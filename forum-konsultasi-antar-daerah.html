@@ -4030,6 +4030,44 @@ function pasangPeriksa(field, o){
    mikrofon. Dari berkas (file://) mikrofon bisa jalan, tapi browser tidak
    mengingat izinnya — itu sumber pertanyaan berulang. */
 let peringatBerkas = false;
+/* Dibuka langsung dari berkas (bukan lewat ORBIT-execute.bat): Chrome tidak mengingat izin
+   mikrofon di alamat file://, jadi bertanya tiap dikte menyambung ulang. Tandanya dibuat
+   selalu terlihat di keterangan dikte supaya laptop yang begini langsung ketahuan. */
+const SUFIKS_BERKAS = location.protocol === 'file:' ? '  ·  ⚠ dibuka dari berkas — izin ditanya terus; buka lewat ORBIT-execute.bat' : '';
+
+/* Mikrofon dipegang SATU untuk seluruh halaman, bukan satu per kolom dikte, dan
+   tidak langsung dilepas saat dikte berhenti. Pindah layar, ganti giliran, atau
+   ganti sesi tadinya melepas mikrofon total, sehingga dikte berikutnya membuka
+   mikrofon dari nol — dan browser yang izinnya hanya "kali ini" bertanya lagi.
+   Sekarang mikrofon dibiarkan siaga beberapa menit setelah dikte berhenti, lalu
+   dilepas sendiri (ikon rekam di tab browser ikut padam). */
+const MIK_SIAGA_MS = 4 * 60 * 1000;
+const MikBersama = {
+  stream: null, sedang: null, timer: null, saatPutus: null,
+  hidup(){ return !!this.stream && this.stream.getAudioTracks().some(t => t.readyState === 'live'); },
+  ambil(){
+    clearTimeout(this.timer); this.timer = null;
+    if(this.hidup()) return Promise.resolve(this.stream);
+    if(this.sedang) return this.sedang;               // permintaan izin masih terbuka
+    this.sedang = navigator.mediaDevices.getUserMedia({audio:true}).then(s => {
+      this.stream = s;
+      try{ localStorage.setItem('orbit-mik-pernah', '1'); }catch(e){}
+      s.getAudioTracks().forEach(t => t.addEventListener('ended', () => {
+        if(this.stream === s){ this.stream = null; if(this.saatPutus) this.saatPutus(); }
+      }));
+      return s;
+    }).finally(() => { this.sedang = null; });
+    return this.sedang;
+  },
+  lepasNanti(){ clearTimeout(this.timer); this.timer = setTimeout(() => this.lepas(), MIK_SIAGA_MS); },
+  lepas(){
+    clearTimeout(this.timer); this.timer = null;
+    const s = this.stream; this.stream = null;
+    if(s){ try{ s.getTracks().forEach(t => t.stop()); }catch(e){} }
+  }
+};
+window.addEventListener('pagehide', () => MikBersama.lepas());
+
 async function periksaIzinMik(){
   let status = '';
   try{ if(navigator.permissions && navigator.permissions.query) status = (await navigator.permissions.query({name:'microphone'})).state; }catch(e){}
@@ -4113,7 +4151,7 @@ function pasangDikte(inputId, btnId, opsi){
       }
       if(selesai.trim()) sisipkan(selesai.trim(), yakin < 1 ? yakin : 0);
       adaSementara = !!sementara.trim();
-      kap.textContent = (sementara.trim() || 'Mendengarkan…') + '  ·  ' + jam();
+      kap.textContent = (sementara.trim() || 'Mendengarkan…') + '  ·  ' + jam() + SUFIKS_BERKAS;
       if(perluSegar && !adaSementara) segarkan();   // hanya saat ada jeda bicara
     };
 
@@ -4178,15 +4216,11 @@ function pasangDikte(inputId, btnId, opsi){
      dari nol — dan di laptop yang izinnya "hanya kali ini", dibuka dari
      berkas langsung, atau ber-port lain, browser bertanya izin LAGI tiap kali.
      Selama aliran ini terbuka, izinnya tetap hidup dan tidak ditanya ulang. */
-  let pegangMic = null, memintaMic = false;
-  function lepasMic(){
-    if(pegangMic){ try{ pegangMic.getTracks().forEach(t => t.stop()); }catch(e){} }
-    pegangMic = null;
-  }
+  let memintaMic = false;
 
   async function mulai(){
     if(memintaMic) return;              // klik ganda saat dialog izin terbuka
-    if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && !pegangMic){
+    if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && !MikBersama.hidup()){
       kap.textContent = 'Memeriksa izin mikrofon…'; kap.classList.add('on');
       memintaMic = true;
       /* Periksa dulu keadaan izin di laptop ini, supaya masalahnya disebut
@@ -4207,10 +4241,18 @@ function pasangDikte(inputId, btnId, opsi){
         peringatBerkas = true;
         toast('ORBIT dibuka langsung dari berkas — browser bisa menanyakan izin mikrofon berulang. Buka lewat ORBIT-execute.bat.');
       }
-      kap.textContent = izin.status === 'prompt'
-        ? 'Browser akan meminta izin mikrofon — klik “Izinkan” (pilih “Izinkan saat mengunjungi situs” bila ada, supaya tidak ditanya lagi).'
-        : 'Meminta izin mikrofon…';
-      try{ pegangMic = await navigator.mediaDevices.getUserMedia({audio:true}); }
+      let pernah = false;
+      try{ pernah = localStorage.getItem('orbit-mik-pernah') === '1'; }catch(e){}
+      if(izin.status === 'prompt' && pernah){
+        /* Izin sudah pernah diberikan di browser ini tetapi hilang lagi: bukan salah ORBIT,
+           biasanya browser menghapus izin saat ditutup. Katakan terus terang. */
+        kap.textContent = 'Browser ini melupakan izin mikrofon yang pernah diberikan (biasanya karena mode Incognito/Tamu, atau setelan “hapus data situs saat browser ditutup”). Klik Izinkan; agar tidak ditanya lagi: ikon gembok di address bar → Setelan situs → Mikrofon → Izinkan.';
+      }else{
+        kap.textContent = izin.status === 'prompt'
+          ? 'Browser akan meminta izin mikrofon — klik “Izinkan” (pilih “Izinkan saat mengunjungi situs” bila ada, supaya tidak ditanya lagi).'
+          : 'Meminta izin mikrofon…';
+      }
+      try{ await MikBersama.ambil(); }
       catch(err){
         memintaMic = false;
         const tolak = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
@@ -4219,11 +4261,11 @@ function pasangDikte(inputId, btnId, opsi){
         return;
       }
       memintaMic = false;
-      // mikrofon dicabut / diganti di tengah dikte: katakan terus terang, jangan diam-diam mati
-      pegangMic.getAudioTracks().forEach(t => t.addEventListener('ended', () => {
-        if(aktif) henti('Mikrofon terputus (dicabut atau diganti). Periksa colokan, lalu klik Dikte lagi.');
-      }));
     }
+    // mikrofon dicabut / diganti di tengah dikte: katakan terus terang, jangan diam-diam mati
+    MikBersama.saatPutus = () => {
+      if(aktif) henti('Mikrofon terputus (dicabut atau diganti). Periksa colokan, lalu klik Dikte lagi.');
+    };
     aktif = true;
     gagalBeruntun = 0;
     perluSegar = false; adaSementara = false;
@@ -4232,7 +4274,7 @@ function pasangDikte(inputId, btnId, opsi){
     wrap.classList.add('rekam');            // kolom dipertinggi selama dikte
     if(lbl) lbl.textContent = 'Merekam…';
     btn.title = 'Berhenti merekam';
-    kap.textContent = 'Mendengarkan…  ·  00:00';
+    kap.textContent = 'Mendengarkan…  ·  00:00' + SUFIKS_BERKAS;
     kap.classList.add('on');
     nyalakanSesi();
 
@@ -4244,7 +4286,7 @@ function pasangDikte(inputId, btnId, opsi){
       if(diam > BATAS_BISU){
         // mati bisu — tidak ada hasil, tidak ada error, tidak ada sinyal berhenti
         terakhirAktif = Date.now();
-        kap.textContent = 'Menyambung ulang…  ·  ' + jam();
+        kap.textContent = 'Menyambung ulang…  ·  ' + jam() + SUFIKS_BERKAS;
         segarkan();
       }else if(umur > UMUR_SESI){
         perluSegar = true;               // dijalankan saat penutur berhenti sejenak
@@ -4254,10 +4296,12 @@ function pasangDikte(inputId, btnId, opsi){
   }
 
   function henti(pesan){
+    const tadiAktif = aktif;
     clearInterval(jaga); jaga = null;
     aktif = false;
     buangSesi();
-    lepasMic();
+    if(pesan) MikBersama.lepas();                       // gagal/terputus: lepas sekarang
+    else if(tadiAktif) MikBersama.lepasNanti();         // berhenti biasa: siaga beberapa menit
     btn.classList.remove('dengar');
     wrap.classList.remove('rekam');
     if(lbl) lbl.textContent = 'Dikte';
@@ -4269,6 +4313,11 @@ function pasangDikte(inputId, btnId, opsi){
       kap.textContent = pesan;
       kap.classList.add('on');
       toast(pesan);
+    }else if(tadiAktif && MikBersama.hidup()){
+      kap.textContent = 'Dikte berhenti. Mikrofon siaga ±4 menit agar tidak ditanya izin lagi, lalu padam sendiri.';
+      kap.classList.add('on');
+      const teks = kap.textContent;
+      setTimeout(() => { if(!aktif && kap.textContent === teks){ kap.classList.remove('on'); kap.textContent = ''; } }, MIK_SIAGA_MS);
     }else{
       kap.classList.remove('on');
       kap.textContent = '';
@@ -9536,8 +9585,8 @@ async function izinMikrofon(){
 }
 function ujiMikrofon(){
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast('Browser ini tidak bisa memakai mikrofon.'); return; }
-  navigator.mediaDevices.getUserMedia({audio:true})
-    .then(s => { s.getTracks().forEach(t => t.stop()); toast('Mikrofon siap dipakai untuk dikte.'); cekSiapKelas(); })
+  MikBersama.ambil()
+    .then(() => { MikBersama.lepasNanti(); toast('Mikrofon siap dipakai untuk dikte.'); cekSiapKelas(); })
     .catch(()=>{ toast('Izin mikrofon ditolak.'); cekSiapKelas(); });
 }
 
