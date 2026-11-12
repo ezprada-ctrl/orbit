@@ -968,6 +968,17 @@ body.mode-standar #panel{display:none!important}
 .std-sampah .sesi{font-size:12.5px;color:var(--text-dim);font-weight:700;margin-bottom:2px}
 .std-sampah .std-aksi{opacity:1}
 .std-sampah .std-aksi .btn{padding:6px 12px;font-size:13px}
+/* Tempat Sampah sengaja tampil "redup": tanpa warna aksen, bingkai putus-putus, latar
+   lebih kelabu dari kartu biasa — sekilas jelas ini area barang terbuang, bukan catatan aktif. */
+:root[data-theme="dark"]{--sampah-bg:#101011;--sampah-isi:rgba(255,255,255,.035);--sampah-garis:#4A4A4F}
+:root[data-theme="light"]{--sampah-bg:#EBEBEE;--sampah-isi:rgba(255,255,255,.6);--sampah-garis:#B4B4BC}
+.std-card.sampah{background:var(--sampah-bg);border:1.5px dashed var(--sampah-garis)}
+.std-card.sampah h4{color:var(--text-dim)}
+.std-card.sampah .blok-judul{color:var(--text-dim)}
+.std-card.sampah .std-tabel td{color:var(--text-dim)}
+.std-sampah .resp{background:var(--sampah-isi);border:1px solid var(--sampah-garis);border-left:3px solid var(--sampah-garis);box-shadow:none}
+.std-sampah .resp .who{color:var(--text-dim)}
+.std-sampah .resp .txt{color:var(--text-dim)}
 .std-hasil mark,.std-tabel mark{background:var(--accent-soft);color:inherit;border-radius:3px}
 .set-opsi{display:grid;gap:12px;margin-top:14px}
 .set-bersama{margin-top:10px;font-size:14px;line-height:1.55}
@@ -8221,7 +8232,7 @@ function htmlTempatSampah(){
   const catatan = [];
   N.sesi.forEach(s => (s.sampah || []).forEach(e => catatan.push({s, e})));
   if(!sesi.length && !catatan.length) return '';
-  return `<div class="std-card" style="margin-top:18px">
+  return `<div class="std-card sampah" style="margin-top:18px">
       <h4>🗑 Tempat Sampah · ${sesi.length + catatan.length}</h4>
       <p class="sub">Yang dihapus berpindah ke sini dan tidak pernah dibuang — tetap ada di arsip dan bisa dipulihkan kapan saja.</p>
       ${sesi.length ? `<table class="std-tabel"><thead><tr><th>Tanggal</th><th>Sesi</th><th>Catatan</th><th>Dihapus</th><th></th></tr></thead><tbody>
