@@ -7882,9 +7882,18 @@ function stdLompat(sid, eid){
 }
 
 function stdUnduhCadangan(){
-  const isi = JSON.stringify({aplikasi:'notulen-mode-standar', versi:1, disimpan:new Date().toISOString(), data:N}, null, 2);
+  /* Cadangan hanya memuat yang AKTIF: sesi di Tempat Sampah dan catatan yang sudah
+     dihapus tidak ikut (arsip otomatis tetap menyimpan semuanya, tidak terpengaruh). */
+  const bersih = JSON.parse(JSON.stringify(N));
+  bersih.sampah = [];
+  bersih.sesi = (bersih.sesi || []).filter(s => !s.dihapus).map(s => {
+    s.sampah = [];
+    s.entri = (s.entri || []).filter(e => !e.dihapus);
+    return s;
+  });
+  const isi = JSON.stringify({aplikasi:'notulen-mode-standar', versi:1, disimpan:new Date().toISOString(), data:bersih}, null, 2);
   unduhBlob(new Blob([isi], {type:'application/json'}), 'notulen-mode-standar-' + hariIni() + '.json');
-  toast('Cadangan ' + N.sesi.length + ' sesi diunduh.');
+  toast('Cadangan ' + bersih.sesi.length + ' sesi aktif diunduh (tanpa Tempat Sampah).');
 }
 /* Digabung, tidak pernah ditimpa: sesi baru ditambahkan, sesi yang sudah ada
    hanya ketambahan catatan yang belum dimilikinya (lihat gabungkanSesiStd). */
