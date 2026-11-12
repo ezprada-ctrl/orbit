@@ -1748,7 +1748,8 @@ body.wi-active :where(button,a,select,summary,[tabindex]):focus-visible{outline-
               <option>Rapat</option><option>Pelatihan</option><option>Forum</option><option>Lainnya</option>
             </select></div>
           <div><label class="fl" for="stdTanggal">Tanggal</label>
-            <input class="field" id="stdTanggal" type="date"></div>
+            <input class="field" id="stdTanggal" type="date">
+            <small id="stdRentang" style="display:block;margin-top:4px;font-size:11px;color:var(--muted,#86868b)"></small></div>
           <div><label class="fl" for="stdTempat">Tempat / penyelenggara</label>
             <input class="field" id="stdTempat" placeholder="Contoh: Ruang Rapat Lt. 3"></div>
         </div>
@@ -7374,7 +7375,7 @@ function stdTab(t){ stdTabAktif = t; if(layarSekarang === 'std') ingatLayar('std
 function renderStd(){
   const s = pastikanSesiStd();
   $id('stdPilihSesi').innerHTML = N.sesi.map(x =>
-    `<option value="${x.id}"${x.id===s.id?' selected':''}>${esc(tanggalPendek(x.tanggal) + ' · ' + judulSesiStd(x))}</option>`).join('');
+    `<option value="${x.id}"${x.id===s.id?' selected':''}>${esc(rentangStd(x) + ' · ' + judulSesiStd(x))}</option>`).join('');
   $id('stdTabs').querySelectorAll('button').forEach(b => {
     const on = b.dataset.t === stdTabAktif;
     b.classList.toggle('on', on); b.setAttribute('aria-selected', on);
@@ -7390,6 +7391,29 @@ function renderStd(){
 function tanggalPendek(t){
   try{ return tanggalLokal(t).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'}); }
   catch(e){ return t || ''; }
+}
+/* Tanggal sesi = rentang hari catatan yang benar-benar ada (pertama – terakhir).
+   Isian "Tanggal" di form hanya cadangan untuk sesi yang belum punya catatan
+   (catatan impor tidak punya waktu, jadi tidak dihitung). */
+function rentangHariStd(s){
+  const h = (s.entri || []).filter(e => !e.impor).map(e => hariKunci(e.waktu)).filter(Boolean).sort();
+  return h.length ? [h[0], h[h.length - 1]] : [s.tanggal, s.tanggal];
+}
+function rentangStd(s, panjang){
+  const [a, b] = rentangHariStd(s);
+  const fmt = (t, tahun) => {
+    const d = tanggalLokal(t);
+    if(panjang){
+      const x = bulanID(d);
+      return tahun ? x : x.replace(/ \d{4}$/, '');
+    }
+    return d.toLocaleDateString('id-ID', tahun ? {day:'numeric', month:'short', year:'numeric'} : {day:'numeric', month:'short'});
+  };
+  try{
+    if(a === b) return fmt(a, true);
+    const beda = a.slice(0, 4) !== b.slice(0, 4);
+    return fmt(a, beda) + ' – ' + fmt(b, true);
+  }catch(e){ return a || ''; }
 }
 function jamDari(iso){ try{ return new Date(iso).toTimeString().slice(0,5); }catch(e){ return ''; } }
 /* Satu sesi bisa mencakup beberapa hari, jadi jam saja tidak cukup:
@@ -7408,6 +7432,8 @@ function hariPanjang(iso){ try{ return new Date(iso).toLocaleDateString('id-ID',
 function isiMetaStd(s){
   $id('stdJudul').value = s.judul; $id('stdJenis').value = s.jenis;
   $id('stdTanggal').value = s.tanggal; $id('stdTempat').value = s.tempat;
+  $id('stdRentang').textContent = s.entri.some(e => !e.impor)
+    ? 'Tanggal di judul & dokumen: ' + rentangStd(s) + ' (dari catatan)' : 'Belum ada catatan — memakai tanggal ini.';
 }
 ['stdJudul','stdJenis','stdTanggal','stdTempat'].forEach(id=>{
   $id(id).addEventListener(id === 'stdJenis' || id === 'stdTanggal' ? 'change' : 'input', ()=>{
@@ -7417,7 +7443,7 @@ function isiMetaStd(s){
     simpanN();
     // judul di pemilih sesi ikut berubah tanpa merender ulang kolom yang sedang diketik
     const opt = $id('stdPilihSesi').querySelector(`option[value="${s.id}"]`);
-    if(opt) opt.textContent = tanggalPendek(s.tanggal) + ' · ' + judulSesiStd(s);
+    if(opt) opt.textContent = rentangStd(s) + ' · ' + judulSesiStd(s);
   });
 });
 
@@ -7621,7 +7647,7 @@ function renderPesertaStd(){
         <label class="fl" for="stdSalinDari">Kelas yang sama dengan sesi sebelumnya? Salin pesertanya</label>
         <div class="std-bar" style="margin:0">
           <select class="field" id="stdSalinDari">${lain.map(x =>
-            `<option value="${x.id}">${esc(tanggalPendek(x.tanggal) + ' · ' + judulSesiStd(x) + ' (' + x.peserta.length + ' org)')}</option>`).join('')}</select>
+            `<option value="${x.id}">${esc(rentangStd(x) + ' · ' + judulSesiStd(x) + ' (' + x.peserta.length + ' org)')}</option>`).join('')}</select>
           <button class="btn btn-ghost" onclick="stdSalinPeserta()">Salin ke sesi ini</button>
         </div></div>` : ''}
     </div>
@@ -7717,7 +7743,7 @@ function stdTambahPeserta(){
 }
 function stdSalinPeserta(){
   const dari = N.sesi.find(x => x.id === $id('stdSalinDari').value); if(!dari) return;
-  if(!confirm('Salin ' + dari.peserta.length + ' peserta dari "' + judulSesiStd(dari) + '" (' + tanggalPendek(dari.tanggal) + ') ke sesi ini?\n\nBisa diurungkan sesaat setelahnya.')) return;
+  if(!confirm('Salin ' + dari.peserta.length + ' peserta dari "' + judulSesiStd(dari) + '" (' + rentangStd(dari) + ') ke sesi ini?\n\nBisa diurungkan sesaat setelahnya.')) return;
   terapkanPesertaStd(dari.peserta.map(p => ({nama:p.nama, unit:p.unit, daerah:p.daerah || '', extra:{...(p.extra || {})}})));
 }
 /* Peserta contoh — buat coba-coba alur pencatatan tanpa perlu impor Excel
@@ -7776,7 +7802,7 @@ function renderCariStd(){
     <div class="std-card">
       <h4>Arsip sesi · ${N.sesi.length}</h4>
       <table class="std-tabel"><thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Jenis</th><th>Peserta</th><th>Catatan</th><th></th></tr></thead><tbody>
-      ${N.sesi.map(x => `<tr><td>${esc(tanggalPendek(x.tanggal))}</td><td>${esc(judulSesiStd(x))}${x.id===N.aktifId?' <span style="color:var(--accent);font-size:12px;font-weight:700">· terbuka</span>':''}</td>
+      ${N.sesi.map(x => `<tr><td>${esc(rentangStd(x))}</td><td>${esc(judulSesiStd(x))}${x.id===N.aktifId?' <span style="color:var(--accent);font-size:12px;font-weight:700">· terbuka</span>':''}</td>
         <td>${esc(x.jenis)}</td><td>${x.peserta.length}</td><td>${x.entri.length}</td>
         <td class="aksi"><button class="btn btn-ghost" onclick="stdBukaSesi('${x.id}')">Buka</button>
         <button class="btn btn-ghost" onclick="stdEksporPDF('${x.id}')">PDF</button>
@@ -7818,7 +7844,7 @@ function renderHasilCari(){
   const MAKS = 150;
   el.innerHTML = `<div class="blok-judul">${hasil.length} catatan cocok${hasil.length > MAKS ? `<small>menampilkan ${MAKS} pertama — persempit kata kuncinya</small>` : ''}</div>`
     + hasil.slice(0, MAKS).map(h => `<div class="resp" onclick="stdLompat('${h.s.id}','${h.e.id}')" title="Buka di percakapannya">
-        <div class="sesi">${esc(tanggalPendek(h.s.tanggal) + ' · ' + judulSesiStd(h.s))} · catatan ${h.i+1}</div>
+        <div class="sesi">${esc(rentangStd(h.s) + ' · ' + judulSesiStd(h.s))} · catatan ${h.i+1}</div>
         <div class="who">${sorot(h.p.nama, kata[0])}${h.p.unit ? `<span class="unit">· ${sorot(h.p.unit, kata[0])}</span>` : ''}</div>
         <div class="txt">${cuplikan(h.e.isi, kata)}</div></div>`).join('');
 }
@@ -8103,7 +8129,7 @@ function teksSesiStd(s, laptop){
   rapikanSesiStd(s);
   let ada = false;
   const isi = s.entri.map(e => { const t = isiTeksTanda(e); if(t.includes('[?')) ada = true; return t; });
-  const b = ['NOTULEN: ' + judulSesiStd(s), 'Tanggal: ' + tglPanjang(s.tanggal), 'Jenis: ' + s.jenis];
+  const b = ['NOTULEN: ' + judulSesiStd(s), 'Tanggal: ' + rentangStd(s, true), 'Jenis: ' + s.jenis];
   if(s.tempat) b.push('Tempat: ' + s.tempat);
   if(laptop) b.push('Laptop asal: ' + laptop);
   b.push('Jumlah catatan: ' + s.entri.length, '');
@@ -8199,7 +8225,7 @@ function htmlTempatSampah(){
       <h4>🗑 Tempat Sampah · ${sesi.length + catatan.length}</h4>
       <p class="sub">Yang dihapus berpindah ke sini dan tidak pernah dibuang — tetap ada di arsip dan bisa dipulihkan kapan saja.</p>
       ${sesi.length ? `<table class="std-tabel"><thead><tr><th>Tanggal</th><th>Sesi</th><th>Catatan</th><th>Dihapus</th><th></th></tr></thead><tbody>
-        ${sesi.map(x => `<tr><td>${esc(tanggalPendek(x.tanggal))}</td><td>${esc(judulSesiStd(x))}</td><td>${x.entri.length}</td>
+        ${sesi.map(x => `<tr><td>${esc(rentangStd(x))}</td><td>${esc(judulSesiStd(x))}</td><td>${x.entri.length}</td>
           <td>${esc(new Date(x.dihapus).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'}))}</td>
           <td class="aksi"><button class="btn btn-ghost" onclick="stdPulihkanSesi('${x.id}')">Pulihkan</button></td></tr>`).join('')}
       </tbody></table>` : ''}
@@ -8273,7 +8299,7 @@ function cekSiapStd(s){
 async function stdEksporPDF(sid){
   const s = sid ? N.sesi.find(x => x.id === sid) : sesiStd();
   if(!s || !cekSiapStd(s) || !ingatRagu(s.entri) || !(await pastikanPDF())) return;
-  const judul = judulSesiStd(s), tgl = bulanID(tanggalLokal(s.tanggal));
+  const judul = judulSesiStd(s), tgl = rentangStd(s, true);
   const ctx = buatDoc(judul.length > 80 ? judul.slice(0,78) + '…' : judul);
   ctx.kaki = 'Notulen ' + s.jenis;
   const {doc, W, H} = ctx;
@@ -8380,7 +8406,7 @@ p{margin:0 0 6pt;line-height:1.4}.k{color:#6e7387;font-size:9.5pt}</style></head
 <p class="k">NOTULEN ${esc(s.jenis.toUpperCase())}</p>
 <h1>${esc(judul)}</h1>
 <table style="border-collapse:collapse;margin:8pt 0 4pt">
-<tr><td class="k" style="padding:2px 16px 2px 0">Tanggal</td><td><b>${esc(bulanID(tanggalLokal(s.tanggal)))}</b></td></tr>
+<tr><td class="k" style="padding:2px 16px 2px 0">Tanggal</td><td><b>${esc(rentangStd(s, true))}</b></td></tr>
 <tr><td class="k" style="padding:2px 16px 2px 0">Tempat / penyelenggara</td><td><b>${esc(s.tempat || '—')}</b></td></tr>
 <tr><td class="k" style="padding:2px 16px 2px 0">Peserta</td><td><b>${s.peserta.length} orang</b> · ${stat.size} berbicara · ${s.entri.length} catatan</td></tr>
 </table>
