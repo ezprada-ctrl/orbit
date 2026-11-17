@@ -31,3 +31,6 @@ ORBIT-Bersama/
 
 # Arsip transkrip semua sesi - isi rapat/kelas nyata, milik tiap laptop
 arsip-transkrip/
+
+# Penanda laptop pengembang (nama komputer) - hanya lokal; lihat server.py salinan_pengembang()
+.pengembang

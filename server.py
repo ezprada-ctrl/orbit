@@ -38,12 +38,41 @@ BERKAS_APLIKASI = [
 ]
 
 
+BERKAS_PENGEMBANG = os.path.join(AKAR, '.pengembang')   # lokal: tidak ikut git/zip rilis
+
+
+def nama_komputer():
+    return socket.gethostname().strip().lower()
+
+
 def salinan_pengembang():
-    """Laptop pengembang (folder ini punya .git) vs laptop PTP biasa (dari ZIP rilis).
-    Rilis GitHub bisa tertinggal dari commit lokal yang belum dirilis — menimpa
-    salinan pengembang dengan rilis lama akan menghapus balik pekerjaan yang
-    sedang berjalan. Salinan PTP tidak punya .git sama sekali, tidak terpengaruh."""
-    return os.path.isdir(os.path.join(AKAR, '.git'))
+    """Apakah folder ini sedang dipakai di LAPTOP PENGEMBANG?
+
+    Update lewat unduhan rilis menimpa berkas aplikasi. Di laptop pengembang itu
+    berbahaya (rilis bisa tertinggal dari pekerjaan lokal), jadi ditolak.
+    Penandanya BUKAN folder .git — folder yang disalin utuh ke laptop PTP ikut
+    membawa .git dan dulu keliru dianggap laptop pengembang. Penandanya berkas
+    `.pengembang` berisi NAMA KOMPUTER yang boleh dianggap pengembang: bila folder
+    disalin ke komputer lain, namanya tidak cocok, sehingga Update tetap jalan.
+    Tanpa berkas itu (semua laptop PTP) -> bukan pengembang."""
+    try:
+        with open(BERKAS_PENGEMBANG, encoding='utf-8') as f:
+            return nama_komputer() in {b.strip().lower() for b in f if b.strip()}
+    except OSError:
+        return False
+
+
+def tandai_pengembang():
+    """Dijalankan sekali oleh pengembang: `python server.py --tandai-pengembang`."""
+    nama = socket.gethostname().strip()
+    if salinan_pengembang():
+        print('  Komputer ini (%s) sudah ditandai sebagai laptop pengembang.' % nama)
+        return
+    with open(BERKAS_PENGEMBANG, 'a', encoding='utf-8') as f:
+        f.write(nama + '\n')
+    print('  Komputer ini (%s) ditandai sebagai laptop pengembang: Update lewat unduhan dimatikan di sini.' % nama)
+
+
 
 IZIN = {
     '/forum-konsultasi-antar-daerah.html',
@@ -830,9 +859,9 @@ class Penangan(SimpleHTTPRequestHandler):
         if jalur == '/api/update':
             if salinan_pengembang():
                 return self.kirim_json({'ok': False, 'pesan':
-                    'Ini salinan pengembang (folder .git ada) — pembaruan lewat tombol ini '
+                    'Komputer ini ditandai sebagai laptop pengembang — pembaruan lewat tombol ini '
                     'dimatikan supaya tidak menimpa balik pekerjaan yang belum dirilis. '
-                    'Perbarui salinan ini lewat git, bukan lewat tombol Update.'})
+                    'Perbarui lewat git, bukan lewat tombol Update.'})
             try:
                 etag = unduh_dan_pasang_update()
             except Exception as e:
@@ -1011,5 +1040,7 @@ def main():
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == '--auto-update':
         cek_dan_pasang_update_otomatis()   # cek + pasang lalu keluar; tidak menyalakan server
+    elif len(sys.argv) > 1 and sys.argv[1] == '--tandai-pengembang':
+        tandai_pengembang()
     else:
         main()

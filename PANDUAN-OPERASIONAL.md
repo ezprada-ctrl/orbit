@@ -22,6 +22,12 @@ Dokumen ini bisa dicetak dan ditaruh di sebelah laptop.
 > Sistem otomatis menarik versi terbaru, memasangnya, menyalakan ulang server,
 > lalu memuat ulang halaman sendiri. Jendela hitam boleh berkedip sebentar —
 > jangan ditutup sampai halaman terbuka lagi.
+>
+> **Update ditolak dengan pesan "ditandai sebagai laptop pengembang"?** Itu penjaga khusus
+> laptop pengembang aplikasi. Laptop PTP tidak punya penandanya (berkas `.pengembang`), jadi
+> seharusnya tidak pernah muncul. Kalau muncul karena folder ORBIT disalin utuh dari laptop
+> pengembang, hapus berkas tersembunyi `.pengembang` di folder ORBIT itu, lalu coba lagi.
+> (Pengembang menandai laptopnya sekali lewat `python server.py --tandai-pengembang`.)
 
 ---
 

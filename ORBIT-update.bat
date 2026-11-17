@@ -3,17 +3,20 @@ cd /d "%~dp0"
 title ORBIT -- Cek Pembaruan
 color 0B
 
-if exist ".git" (
+REM Hanya komputer yang NAMANYA tercatat di .pengembang yang ditolak. Folder .git saja tidak
+REM cukup: folder yang disalin utuh ke laptop PTP ikut membawa .git, tapi nama komputernya beda.
+set "PENGEMBANG=0"
+if exist ".pengembang" for /f "usebackq delims=" %%N in (".pengembang") do if /i "%%N"=="%COMPUTERNAME%" set "PENGEMBANG=1"
+if "%PENGEMBANG%"=="1" (
   echo ============================================================
   echo   ORBIT - Cek dan Pasang Pembaruan
   echo ============================================================
   echo.
-  echo   [DIBATALKAN] Folder ini punya ".git" - ini salinan pengembang,
-  echo   bukan salinan pasang-pakai dari rilis.
+  echo   [DIBATALKAN] Komputer ini ditandai sebagai laptop pengembang.
   echo.
   echo   Rilis GitHub bisa tertinggal dari perubahan lokal yang belum
   echo   dirilis. Menimpanya lewat skrip ini akan menghapus balik
-  echo   pekerjaan yang sedang berjalan. Perbarui salinan ini lewat git.
+  echo   pekerjaan yang sedang berjalan. Perbarui lewat git.
   echo.
   pause
   exit /b 1
