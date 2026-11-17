@@ -557,6 +557,72 @@ def status_transkrip():
             'laptop': id_laptop(), 'laptopLain': len([x for x in laptop if x != id_laptop()])}
 
 
+def _galat_sertifikat(e):
+    """True bila galat berasal dari pemeriksaan sertifikat HTTPS."""
+    import ssl
+    sebab = getattr(e, 'reason', None)
+    return (isinstance(e, ssl.SSLError) or isinstance(sebab, ssl.SSLError)
+            or 'CERTIFICATE_VERIFY_FAILED' in str(e))
+
+
+def _unduh_via_curl(url, metode, batas):
+    """Cadangan untuk jaringan kantor yang 'membongkar' HTTPS (proxy dengan sertifikat
+    sendiri): curl.exe bawaan Windows memakai gudang sertifikat Windows — yang sudah
+    dipercaya Edge/Chrome di laptop itu — dan mengambil sertifikat perantara yang
+    kurang, sedangkan Python hanya menerima bundel sertifikatnya sendiri. Sertifikat
+    tetap DIPERIKSA (tidak ada mode 'abaikan keamanan'). Mengembalikan (isi, etag)."""
+    import subprocess
+    import tempfile
+    curl = os.path.join(os.environ.get('SystemRoot', r'C:\Windows'), 'System32', 'curl.exe')
+    if not os.path.exists(curl):
+        raise RuntimeError('curl.exe bawaan Windows tidak ditemukan')
+    with tempfile.TemporaryDirectory() as tmp:
+        f_header = os.path.join(tmp, 'h.txt')
+        f_isi = os.path.join(tmp, 'isi.bin')
+        cmd = [curl, '-sS', '-f', '-L', '--ssl-no-revoke', '--max-time', str(batas),
+               '-A', 'ORBIT-update', '-D', f_header, '-o', f_isi]
+        if metode == 'HEAD':
+            cmd.append('-I')
+        cmd.append(url)
+        hasil = subprocess.run(cmd, capture_output=True, timeout=batas + 15)
+        if hasil.returncode != 0:
+            raise RuntimeError((hasil.stderr or b'').decode('utf-8', 'replace').strip()
+                               or 'curl keluar dengan kode %d' % hasil.returncode)
+        with open(f_header, 'rb') as f:
+            blok = f.read().decode('latin-1').replace('\r\n', '\n').strip().split('\n\n')
+        etag = lm = None   # blok terakhir = respons akhir setelah semua pengalihan
+        for baris in blok[-1].split('\n'):
+            kunci, _, nilai = baris.partition(':')
+            if kunci.strip().lower() == 'etag':
+                etag = nilai.strip()
+            elif kunci.strip().lower() == 'last-modified':
+                lm = nilai.strip()
+        isi = b''
+        if metode == 'GET':
+            with open(f_isi, 'rb') as f:
+                isi = f.read()
+        return isi, (etag or lm)
+
+
+def unduh_https(url, metode='GET', batas=30):
+    """Unduh lewat Python; bila ditolak karena sertifikat (jaringan kantor), coba lewat
+    curl.exe Windows. Mengembalikan (isi, etag)."""
+    import urllib.request
+    req = urllib.request.Request(url, headers={'User-Agent': 'ORBIT-update'}, method=metode)
+    try:
+        with urllib.request.urlopen(req, timeout=batas) as r:
+            isi = r.read() if metode == 'GET' else b''
+            return isi, (r.headers.get('ETag') or r.headers.get('Last-Modified'))
+    except Exception as e:
+        if not _galat_sertifikat(e):
+            raise
+        galat_py = e
+    try:
+        return _unduh_via_curl(url, metode, batas)
+    except Exception as e2:
+        raise RuntimeError('%s | cadangan curl.exe juga gagal: %s' % (galat_py, e2))
+
+
 def unduh_dan_pasang_update():
     """Tarik rilis terbaru dari GitHub lalu pasang di tempat. Mengembalikan
     ETag rilis yang baru dipasang (dicatat pemanggil ke TANDA_VERSI), atau
@@ -567,14 +633,10 @@ def unduh_dan_pasang_update():
     meninggalkan sebagian berkas versi baru dan sebagian versi lama.
     """
     import io
-    import urllib.request
     import zipfile
 
-    permintaan = urllib.request.Request(RILIS_ZIP_URL, headers={'User-Agent': 'ORBIT-update'})
     try:
-        with urllib.request.urlopen(permintaan, timeout=30) as r:
-            data = r.read()
-            etag = r.headers.get('ETag') or r.headers.get('Last-Modified')
+        data, etag = unduh_https(RILIS_ZIP_URL, 'GET', 30)
     except Exception as e:
         raise RuntimeError('Tidak bisa mengunduh pembaruan (periksa internet): %s' % e)
 
@@ -623,13 +685,10 @@ def ambil_etag_rilis():
     """Tanda versi rilis terbaru di GitHub, (etag, galat). Batas waktu 15 detik dan dicoba
     dua kali: dulu 5 detik sekali coba, sehingga jaringan kantor yang lambat/baru tersambung
     membuat pengecekan GAGAL DIAM-DIAM dan laptop tak pernah memperbarui diri."""
-    import urllib.request
     galat = ''
     for percobaan in range(2):
         try:
-            req = urllib.request.Request(RILIS_ZIP_URL, headers={'User-Agent': 'ORBIT-update'}, method='HEAD')
-            with urllib.request.urlopen(req, timeout=15) as r:
-                return (r.headers.get('ETag') or r.headers.get('Last-Modified')), ''
+            return unduh_https(RILIS_ZIP_URL, 'HEAD', 15)[1], ''
         except Exception as e:
             galat = '%s: %s' % (type(e).__name__, e)
             if percobaan == 0:
