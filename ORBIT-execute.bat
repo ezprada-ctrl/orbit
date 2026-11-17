@@ -49,9 +49,17 @@ if not defined PYEXE (
 REM Cek & pasang pembaruan otomatis sebelum aplikasi dibuka — jadi PTP tidak
 REM perlu ingat pencet Ctrl+Shift+U atau buka ORBIT-update.bat manual tiap ada
 REM rilis baru. Diam-diam dilewati kalau laptop belum tersambung internet.
+REM Kode keluar 10 = pembaruan BARU dipasang. Berkas .bat ini ikut terganti saat skrip masih
+REM berjalan (cmd membaca berkas dari posisi lama -> bisa salah baca), jadi seluruh langkah ini
+REM dibungkus satu blok dan, bila ada pembaruan, langsung mulai ulang dari berkas baru lalu keluar.
 if exist "%~dp0server.py" (
   echo   Mengecek pembaruan...
   %PYEXE% "%~dp0server.py" --auto-update
+  if errorlevel 10 (
+    echo   Pembaruan terpasang. Memulai ulang ORBIT...
+    start "" "%~f0"
+    exit
+  )
   echo.
 )
 

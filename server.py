@@ -608,6 +608,51 @@ def unduh_dan_pasang_update():
 
 
 TANDA_VERSI = os.path.join(AKAR, '.versi-terpasang')   # dicatat lokal saja — tidak ikut ke-zip, tidak ikut git
+STATUS_UPDATE = os.path.join(AKAR, '.status-update.json')   # hasil pengecekan terakhir; lokal saja
+
+
+def etag_terpasang():
+    try:
+        with open(TANDA_VERSI, encoding='utf-8') as f:
+            return f.read().strip()
+    except OSError:
+        return None   # belum ada tanda -> dianggap perlu update
+
+
+def ambil_etag_rilis():
+    """Tanda versi rilis terbaru di GitHub, (etag, galat). Batas waktu 15 detik dan dicoba
+    dua kali: dulu 5 detik sekali coba, sehingga jaringan kantor yang lambat/baru tersambung
+    membuat pengecekan GAGAL DIAM-DIAM dan laptop tak pernah memperbarui diri."""
+    import urllib.request
+    galat = ''
+    for percobaan in range(2):
+        try:
+            req = urllib.request.Request(RILIS_ZIP_URL, headers={'User-Agent': 'ORBIT-update'}, method='HEAD')
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return (r.headers.get('ETag') or r.headers.get('Last-Modified')), ''
+        except Exception as e:
+            galat = '%s: %s' % (type(e).__name__, e)
+            if percobaan == 0:
+                time.sleep(2)
+    return None, galat
+
+
+def catat_status_update(hasil, galat=''):
+    """hasil: terbaru | dipasang | gagal-cek | gagal-pasang | dilewati-pengembang."""
+    try:
+        with open(STATUS_UPDATE, 'w', encoding='utf-8') as f:
+            json.dump({'waktu': time.strftime('%Y-%m-%dT%H:%M:%S'), 'hasil': hasil, 'galat': str(galat)[:300]},
+                      f, ensure_ascii=False)
+    except OSError:
+        pass
+
+
+def baca_status_update():
+    try:
+        with open(STATUS_UPDATE, encoding='utf-8') as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
 
 
 def cek_dan_pasang_update_otomatis():
@@ -622,41 +667,43 @@ def cek_dan_pasang_update_otomatis():
     Belum ada tanda lokal (laptop PTP yang baru mengekstrak ORBIT.zip, yang
     bisa saja sudah basi) -> langsung unduh rilis terbaru di jalan pertama.
     Salinan pengembang tidak terpengaruh: ia sudah dilewati di atas lewat
-    salinan_pengembang()."""
+    salinan_pengembang().
+
+    Mengembalikan True bila ada pembaruan yang BARU dipasang (pemanggil memakai
+    ini untuk menyalakan ulang ORBIT-execute.bat yang ikut terganti). Setiap
+    hasil — termasuk kegagalan menghubungi GitHub — dicatat ke .status-update.json
+    supaya terlihat di Setelan, tidak hilang diam-diam di jendela hitam."""
     if salinan_pengembang():
-        print('  (salinan pengembang terdeteksi — cek pembaruan otomatis dilewati; pakai git)')
-        return
-    import urllib.request
-    try:
-        req = urllib.request.Request(RILIS_ZIP_URL, headers={'User-Agent': 'ORBIT-update'}, method='HEAD')
-        with urllib.request.urlopen(req, timeout=5) as r:
-            etag = r.headers.get('ETag') or r.headers.get('Last-Modified')
-    except Exception:
-        print('  (lewati cek pembaruan — tidak ada internet)')
-        return
+        print('  (komputer ini ditandai laptop pengembang — cek pembaruan otomatis dilewati; pakai git)')
+        catat_status_update('dilewati-pengembang')
+        return False
+    etag, galat = ambil_etag_rilis()
     if not etag:
-        return
-    try:
-        with open(TANDA_VERSI, encoding='utf-8') as f:
-            lama = f.read().strip()
-    except OSError:
-        lama = None   # belum ada tanda -> dianggap perlu update
-    if etag == lama:
+        print('  [!] Tidak bisa memeriksa pembaruan (%s).' % (galat or 'GitHub tidak memberi tanda versi'))
+        print('      Aplikasi dibuka dengan versi yang ada. Cek internet/jaringan kantor, atau')
+        print('      buka Setelan di ORBIT lalu klik "Periksa & perbarui sekarang".')
+        catat_status_update('gagal-cek', galat or 'tanda versi kosong')
+        return False
+    if etag == etag_terpasang():
         print('  Sudah versi terbaru.')
-        return
+        catat_status_update('terbaru')
+        return False
     print('  Versi baru ditemukan — memasang...')
     try:
         etag = unduh_dan_pasang_update() or etag
     except Exception as e:
         print('  [!] Gagal memasang pembaruan otomatis: %s' % e)
         print('  Aplikasi tetap dibuka dengan versi yang ada.')
-        return
+        catat_status_update('gagal-pasang', str(e))
+        return False
     try:
         with open(TANDA_VERSI, 'w', encoding='utf-8') as f:
             f.write(etag)
     except OSError:
         pass
+    catat_status_update('dipasang')
     print('  Selesai — aplikasi dibuka dengan versi terbaru.')
+    return True
 
 
 def mulai_ulang_server():
@@ -765,6 +812,28 @@ class Penangan(SimpleHTTPRequestHandler):
                 return self.kirim_json(status_transkrip())
             return self.kirim_json({'ok': True, 'laptop': id_laptop(), 'transkrip': semua_transkrip()})
 
+        if jalur == '/api/update/status':
+            # Dipakai halaman ORBIT tiap dibuka di layar pembuka: ada rilis baru? (server yang
+            # hidup berhari-hari tak pernah menjalankan cek saat peluncuran). cek=1 -> tanya GitHub sekarang.
+            if not self.dari_laptop():
+                return self.kirim_json({'ok': False, 'pesan': 'Tidak diizinkan.'}, 403)
+            hasil = {'ok': True, 'pengembang': salinan_pengembang(), 'status': baca_status_update(),
+                     'ada': None, 'galat': ''}
+            if 'cek=1' in self.path and not hasil['pengembang']:
+                etag, galat = ambil_etag_rilis()
+                if etag:
+                    hasil['ada'] = etag != etag_terpasang()
+                else:
+                    hasil['galat'] = galat or 'tanda versi kosong'
+                    catat_status_update('gagal-cek', hasil['galat'])
+                    hasil['status'] = baca_status_update()
+                if hasil['ada'] is False:
+                    catat_status_update('terbaru')
+                    hasil['status'] = baca_status_update()
+            with KUNCI:   # jendela bid / penilaian terbuka = jangan nyalakan ulang server
+                hasil['aman'] = not JENDELA.get('buka') and not NILAI.get('buka')
+            return self.kirim_json(hasil)
+
         if jalur == '/api/liga/bids':
             if not self.dari_laptop():
                 return self.kirim_json({'ok': False, 'pesan': 'Tidak diizinkan.'}, 403)
@@ -865,6 +934,7 @@ class Penangan(SimpleHTTPRequestHandler):
             try:
                 etag = unduh_dan_pasang_update()
             except Exception as e:
+                catat_status_update('gagal-pasang', str(e))
                 return self.kirim_json({'ok': False, 'pesan': str(e)})
             if etag:
                 try:
@@ -872,6 +942,7 @@ class Penangan(SimpleHTTPRequestHandler):
                         f.write(etag)
                 except OSError:
                     pass
+            catat_status_update('dipasang')
             self.kirim_json({'ok': True, 'pesan': 'Update terpasang. Menyalakan ulang server...'})
             threading.Thread(target=mulai_ulang_server, daemon=True).start()
             return
@@ -1039,7 +1110,10 @@ def main():
 
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == '--auto-update':
-        cek_dan_pasang_update_otomatis()   # cek + pasang lalu keluar; tidak menyalakan server
+        # cek + pasang lalu keluar; tidak menyalakan server. Kode keluar 10 = baru saja
+        # memasang pembaruan -> ORBIT-execute.bat menyalakan dirinya ulang (berkas .bat
+        # ikut terganti dan tidak boleh dilanjutkan dari posisi lama).
+        sys.exit(10 if cek_dan_pasang_update_otomatis() else 0)
     elif len(sys.argv) > 1 and sys.argv[1] == '--tandai-pengembang':
         tandai_pengembang()
     else:

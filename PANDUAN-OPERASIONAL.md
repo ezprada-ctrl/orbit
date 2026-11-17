@@ -23,6 +23,13 @@ Dokumen ini bisa dicetak dan ditaruh di sebelah laptop.
 > lalu memuat ulang halaman sendiri. Jendela hitam boleh berkedip sebentar —
 > jangan ditutup sampai halaman terbuka lagi.
 >
+> **Sebenarnya PTP tidak perlu menekan apa pun.** ORBIT memeriksa rilis terbaru (1) tiap
+> `ORBIT-execute.bat` dibuka dan (2) tiap halaman ORBIT dibuka di layar pembuka — jadi laptop yang
+> jendela hitamnya dibiarkan hidup berhari-hari pun tetap terbarui. Bila ada versi baru dan tidak ada
+> jendela bid/penilaian yang terbuka, langsung dipasang sendiri. Bila pemeriksaan gagal (internet/jaringan
+> kantor), alasannya tampil di layar pembuka dan di **Setelan → Pembaruan ORBIT**, lengkap dengan tombol
+> **Periksa & perbarui sekarang**.
+>
 > **Update ditolak dengan pesan "ditandai sebagai laptop pengembang"?** Itu penjaga khusus
 > laptop pengembang aplikasi. Laptop PTP tidak punya penandanya (berkas `.pengembang`), jadi
 > seharusnya tidak pernah muncul. Kalau muncul karena folder ORBIT disalin utuh dari laptop

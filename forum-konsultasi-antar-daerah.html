@@ -1441,6 +1441,7 @@ body.wi-active :where(button,a,select,summary,[tabindex]):focus-visible{outline-
           </button>
         </div>
         <p id="lanjutInfo" style="display:none;font-size:13.5px;color:var(--accent);margin-top:14px;font-weight:700"></p>
+        <p id="updateBaris" style="display:none;font-size:13.5px;color:var(--liga);margin-top:14px;font-weight:700"></p>
         <p style="font-size:13.5px;color:var(--text-dim);margin-top:14px;font-weight:600">
           Contoh berisi 12 masalah dari 12 daerah dan 54 tanggapan dari 50 daerah lain —
           untuk gladi bersih atau mengecek tampilan sebelum kelas.
@@ -5497,6 +5498,69 @@ function tampilkanUpdateOv(judul, pesan, gagal){
 }
 function tutupUpdateOv(){ document.getElementById('updateOv').classList.remove('on'); }
 
+/* Pembaruan tidak boleh bergantung pada PTP ingat menekan apa pun, juga tidak boleh gagal
+   diam-diam. Tiap ORBIT dibuka di layar pembuka (server bisa sudah hidup berhari-hari, jadi
+   cek saat peluncuran .bat saja tidak cukup) halaman menanyakan server: ada rilis baru?
+   Bila ada dan tidak ada jendela bid/penilaian terbuka, langsung dipasang; bila tidak,
+   muncul tombol. Hasil & alasan kegagalan juga tampil di Setelan. */
+let statusPembaruan = null;
+async function periksaPembaruan(otomatis){
+  if(location.protocol === 'file:') return null;
+  let d = null;
+  try{ d = await (await fetch('/api/update/status?cek=1', {cache:'no-store'})).json(); }catch(e){}
+  if(!d || !d.ok) return null;
+  statusPembaruan = d;
+  tampilBarisPembaruan();
+  let sudahCoba = false;
+  try{ sudahCoba = !!sessionStorage.getItem('orbit-oto-update'); }catch(e){}
+  if(otomatis && d.ada && d.aman && layarSekarang === 'welcome' && !sudahCoba){
+    try{ sessionStorage.setItem('orbit-oto-update', '1'); }catch(e){}
+    mulaiUpdateOtomatis();
+  }
+  return d;
+}
+function tampilBarisPembaruan(){
+  const el = $id('updateBaris'); if(!el) return;
+  const d = statusPembaruan;
+  if(!d || d.pengembang){ el.style.display = 'none'; return; }
+  if(d.ada){
+    el.innerHTML = 'Versi baru ORBIT tersedia. <button class="btn btn-ghost" style="padding:6px 14px;font-size:13px" onclick="mulaiUpdateOtomatis()">Perbarui sekarang</button>'
+      + (d.aman ? '' : ' <span style="color:var(--text-dim)">(jendela bid/penilaian sedang terbuka — perbarui setelah selesai)</span>');
+    el.style.display = '';
+  }else if(d.galat){
+    el.innerHTML = '⚠ ORBIT belum bisa memeriksa pembaruan (cek internet/jaringan). Versi yang terpasang tetap bisa dipakai. Detailnya ada di Setelan.';
+    el.style.display = '';
+  }else el.style.display = 'none';
+}
+const TEKS_HASIL_UPDATE = {
+  'terbaru': '✓ Sudah versi terbaru.',
+  'dipasang': '✓ Pembaruan terakhir berhasil dipasang.',
+  'gagal-cek': '⚠ Tidak bisa memeriksa pembaruan',
+  'gagal-pasang': '⚠ Pembaruan ditemukan tapi gagal dipasang',
+  'dilewati-pengembang': 'Komputer ini ditandai laptop pengembang — pembaruan otomatis dimatikan.'
+};
+async function tampilSetUpdate(){
+  const el = $id('setUpdate'); if(!el) return;
+  if(location.protocol === 'file:'){ el.innerHTML = '<p>Pembaruan otomatis butuh ORBIT dibuka lewat <b>ORBIT-execute.bat</b>.</p>'; return; }
+  let d = null;
+  try{ d = await (await fetch('/api/update/status', {cache:'no-store'})).json(); }catch(e){}
+  if(!d || !d.ok){ el.innerHTML = '<p>Server ORBIT tidak menjawab — jalankan lewat <b>ORBIT-execute.bat</b>.</p>'; return; }
+  const s = d.status;
+  const waktu = s && s.waktu ? new Date(s.waktu).toLocaleString('id-ID') : '';
+  el.innerHTML = `<p class="${s && (s.hasil === 'terbaru' || s.hasil === 'dipasang') ? 'ok' : ''}">${s ? TEKS_HASIL_UPDATE[s.hasil] || esc(s.hasil) : 'Belum pernah diperiksa di laptop ini.'}${s && s.galat ? ' — ' + esc(s.galat) : ''}</p>
+    ${waktu ? `<p class="kecil">Terakhir diperiksa: ${esc(waktu)}</p>` : ''}
+    ${d.pengembang ? '' : `<div class="set-aksi"><button class="btn btn-ghost" onclick="periksaDanPerbarui(this)">Periksa &amp; perbarui sekarang</button></div>`}`;
+}
+async function periksaDanPerbarui(btn){
+  btn.disabled = true; btn.textContent = 'Memeriksa…';
+  const d = await periksaPembaruan(false);
+  btn.disabled = false; btn.textContent = 'Periksa & perbarui sekarang';
+  if(!d){ toast('Server ORBIT tidak menjawab.'); return; }
+  if(d.ada){ tutupModal(); mulaiUpdateOtomatis(); return; }
+  tampilSetUpdate();
+  toast(d.galat ? 'Belum bisa memeriksa pembaruan.' : 'ORBIT sudah versi terbaru.');
+}
+
 async function mulaiUpdateOtomatis(){
   tampilkanUpdateOv('Memasang pembaruan…', 'Menghubungi server lokal — jangan tutup jendela hitam.', false);
   let hasil;
@@ -7202,6 +7266,8 @@ function bukaSetelan(){
     <p style="color:var(--text-dim);font-size:13.5px;line-height:1.55;margin-top:14px">
       Data kedua mode tersimpan terpisah. Beralih mode tidak menghapus apa pun: data forum &amp; Liga
       dibekukan dan bisa dilanjutkan saat kembali.</p>
+    <div class="rk-lbl">Pembaruan ORBIT</div>
+    <div id="setUpdate" class="set-bersama">Memeriksa…</div>
     <div class="rk-lbl">Arsip Transkrip</div>
     <div id="setArsip" class="set-bersama">Memeriksa…</div>
     <div class="rk-lbl">Ingatan Koreksi Dikte · Bersama</div>
@@ -7211,6 +7277,7 @@ function bukaSetelan(){
     <div style="display:flex;margin-top:18px"><button class="btn btn-ghost" style="margin-left:auto" onclick="tutupModal()">Tutup</button></div>`;
   $id('overlay').classList.add('on');
   cariIngatan = '';
+  tampilSetUpdate();
   tampilSetArsip();
   tampilDaftarIngatan();
   sinkronKKBersama().then(() => { tampilSetBersama(); tampilDaftarIngatan(); });
@@ -9730,6 +9797,8 @@ async function cekSiapKelas(){
     // berkas tersambung diperiksa belakangan karena sifatnya asinkron;
     // isinya menang atas simpanan browser agar sesi bisa pindah laptop
     pulihkanBerkas().then(siapkanLanjut);
+    // juga bila server sudah hidup berhari-hari: tanya rilis terbaru tiap ORBIT dibuka
+    setTimeout(() => periksaPembaruan(true), 1500);
   }
   siapkanLanjut();
 })();

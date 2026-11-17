@@ -34,3 +34,6 @@ arsip-transkrip/
 
 # Penanda laptop pengembang (nama komputer) - hanya lokal; lihat server.py salinan_pengembang()
 .pengembang
+
+# Hasil pengecekan pembaruan terakhir - lokal
+.status-update.json
