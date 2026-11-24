@@ -2782,6 +2782,12 @@ const KAMUS_ISTILAH = [
   ['BUMD',    ['b u m d','be u em de','bumde']],
   ['DJP',     ['d j p','de je pe','dejepe']],
   ['APKD',    ['a p k d','a pe ka de','apekade']],
+  // KUA-PPAS: tiga ejaan salah-dengar yang paling sering (kuha/kuah/kua + pas/ppas) beserta ejaan hurufnya.
+  // Harus di atas 'PPAS' supaya frasa utuhnya yang dibetulkan lebih dulu.
+  ['KUA-PPAS',['kua ppas','kua pas','kuah ppas','kuah pas','kuha ppas','kuha pas','kuwa ppas','kuwa pas','kuwah pas',
+               'kuaha ppas','kuaha pas','kuapas','kuappas','kuahpas','kuhappas','k u a p p a s','ka u a ppas',
+               'ka u a pe pe a es','ku a pe pe a es','kua pe pe a es','kuah-pas','kuha-ppas','kua-pas']],
+  ['PPAS',    ['p p a s','pe pe a es','ppas']],
   ['Widyaiswara', ['widya iswara','widya is wara','widyais wara']],
   ['Kemenkeu',['kemen keu','kemenkeuh','kemen kemenkeu']],
   ['tapping box', ['taping box','tapping boks','taping boks']],
@@ -3156,11 +3162,14 @@ function koreksiInggris(teks){
   return t;
 }
 
-let KK = {ganti:{}, konteks:{}, kenal:{}, tolak:{}, kosa:{}, kosaHapus:{}};
+/* frasa = pembetulan 2–4 kata sekaligus ("kuah pas" → "KUA PPAS"). Pembetulan satu kata
+   (ganti/konteks) tidak bisa menangkap salah dengar yang terpecah jadi beberapa kata
+   sah, jadi frasa disimpan utuh dan dicocokkan utuh. */
+let KK = {ganti:{}, konteks:{}, frasa:{}, kenal:{}, tolak:{}, kosa:{}, kosaHapus:{}};
 function muatKK(){
   try{
     const r = JSON.parse(localStorage.getItem(KK_KEY));
-    if(r && typeof r === 'object') KK = Object.assign({ganti:{}, konteks:{}, kenal:{}, tolak:{}, kosa:{}, kosaHapus:{}}, r);
+    if(r && typeof r === 'object') KK = Object.assign({ganti:{}, konteks:{}, frasa:{}, kenal:{}, tolak:{}, kosa:{}, kosaHapus:{}}, r);
   }catch(e){}
 }
 function simpanKK(){
@@ -3189,11 +3198,11 @@ try{ const r = JSON.parse(localStorage.getItem(KK_LAIN_KEY)); if(Array.isArray(r
 let kkBersama = {tersambung: false, cek: false};
 
 function gabungKK(daftar){
-  const ef = {ganti:{}, konteks:{}, kenal:{}, tolak:{}, kosa:{}, kosaHapus:{}};
-  const suara = {ganti:{}, konteks:{}};
+  const ef = {ganti:{}, konteks:{}, frasa:{}, kenal:{}, tolak:{}, kosa:{}, kosaHapus:{}};
+  const suara = {ganti:{}, konteks:{}, frasa:{}};
   daftar.forEach(k => {
     if(!k) return;
-    ['ganti', 'konteks'].forEach(j => Object.entries(k[j] || {}).forEach(([a, g]) => {
+    ['ganti', 'konteks', 'frasa'].forEach(j => Object.entries(k[j] || {}).forEach(([a, g]) => {
       if(!g || !g.ke) return;
       const s = suara[j][a] = suara[j][a] || {};
       const x = s[g.ke] = s[g.ke] || {ke: g.ke, n: 0, t: 0};
@@ -3205,8 +3214,8 @@ function gabungKK(daftar){
     Object.entries(k.kenal || {}).forEach(([w, t]) => { ef.kenal[w] = Math.max(ef.kenal[w] || 0, +t || 1); });
     Object.entries(k.tolak || {}).forEach(([p, t]) => { ef.tolak[p] = Math.max(ef.tolak[p] || 0, +t || 1); });
   });
-  ['ganti', 'konteks'].forEach(j => Object.entries(suara[j]).forEach(([a, s]) => {
-    const kata = j === 'ganti' ? a : a.split(' ').pop();
+  ['ganti', 'konteks', 'frasa'].forEach(j => Object.entries(suara[j]).forEach(([a, s]) => {
+    const kata = j === 'konteks' ? a.split(' ').pop() : a;   // frasa: seluruh frasa yang ditolak/dihapus
     const hidup = Object.values(s).filter(x => {
       const p = kata + '>' + x.ke.toLowerCase();
       if(!ef.tolak[p]) return true;
@@ -3246,7 +3255,7 @@ async function sinkronKKBersama(cari){
       hitungKKe();
     }
     // pertama tersambung: ingatan laptop ini langsung ikut dibagikan
-    if(baruTersambung && (Object.keys(KK.ganti).length || Object.keys(KK.konteks).length
+    if(baruTersambung && (Object.keys(KK.ganti).length || Object.keys(KK.konteks).length || Object.keys(KK.frasa || {}).length
        || Object.keys(KK.kenal).length || Object.keys(KK.tolak).length)) kirimKKBersama();
   }catch(e){
     kkBersama = {tersambung: false, cek: true, tanpaServer: true};
@@ -3316,7 +3325,7 @@ function kosakata(){
   ISTILAH_ARAH.concat(FRASA_DOMAIN).forEach(f => { kataKata(f).forEach(w => domain.add(w)); tambahTeks(f); });
   WILAYAH.forEach(w => kataKata(w.c).forEach(x => domain.add(x)));
   Object.keys(KKe.kosa).forEach(w => domain.add(w));   // kata baru hasil ketikan PTP, dari semua laptop
-  Object.values(KKe.ganti).concat(Object.values(KKe.konteks))
+  Object.values(KKe.ganti).concat(Object.values(KKe.konteks), Object.values(KKe.frasa))
     .forEach(g => kataKata(g.ke).forEach(x => domain.add(x)));
   const kumpul = (o, d) => {
     if(o == null || d > 8) return;
@@ -3438,9 +3447,37 @@ function koreksiKonteks(teks, sebelum, conf){
   let m;
   while((m = re.exec(teks))) token.push({s: m[0], i: m.index});
   let prev = kataKata(sebelum || '').slice(-1)[0] || '';
-  let keluar = '', pos = 0;
+  let keluar = '', pos = 0, lewat = 0;
+  const adaFrasa = Object.keys(KKe.frasa).length > 0;
   token.forEach((tk, j) => {
+    if(j < lewat) return;   // kata ini sudah ikut tergantikan oleh pembetulan frasa sebelumnya
     const asli = tk.s, w = asli.toLowerCase();
+    /* Pelajaran frasa (2–4 kata) dicoba lebih dulu, yang terpanjang dulu. Kata-katanya harus
+       bersambung spasi saja: "kuah, pas" (dipisah tanda baca) bukan frasa yang sama. */
+    if(adaFrasa){
+      let kena = null;
+      for(let n = Math.min(4, token.length - j); n >= 2 && !kena; n--){
+        const kunci = token.slice(j, j + n).map(x => x.s.toLowerCase()).join(' ');
+        const f = KKe.frasa[kunci];
+        if(!f || KKe.tolak[kunci + '>' + f.ke.toLowerCase()]) continue;
+        let rapat = true;
+        for(let q = j + 1; q < j + n; q++)
+          if(!/^\s+$/.test(teks.slice(token[q-1].i + token[q-1].s.length, token[q].i))) rapat = false;
+        if(rapat) kena = {n, f};
+      }
+      if(kena){
+        const akhir = token[j + kena.n - 1];
+        const jadi = samakanHuruf(asli, kena.f.ke);
+        keluar += teks.slice(pos, tk.i);
+        ganti.push({dari: teks.slice(tk.i, akhir.i + akhir.s.length), ke: jadi, i: keluar.length});
+        keluar += jadi;
+        prev = (jadi.match(RE_KATA) || []).slice(-1)[0] || '';
+        prev = prev.toLowerCase();
+        pos = akhir.i + akhir.s.length;
+        lewat = j + kena.n;
+        return;
+      }
+    }
     const next = token[j+1] ? token[j+1].s.toLowerCase() : '';
     let ke = null, cal = null;
     const kt = KKe.konteks[prev + ' ' + w], gl = KKe.ganti[w];
@@ -3531,10 +3568,17 @@ function usulanDariSuntingan(lama, baru){
   // tempelan/ketikan panjang = menulis, bukan membetulkan kata
   if(!B.length || A.length > 4 || B.length > 4) return null;
   const v = kosakata();
-  const u = {dari: null, ke: null, prev: '', kosa: []};
+  const u = {dari: null, ke: null, prev: '', kosa: [], frasa: false};
 
-  if(A.length === 1 && B.length === 1){
-    const a = A[0].toLowerCase(), b = B[0], bl = b.toLowerCase();
+  if(A.length >= 2){
+    /* 2–4 kata diganti sekaligus ("kuah pas" → "KUA PPAS"): disimpan sebagai frasa utuh.
+       Salah dengar yang terpecah jadi kata-kata sah tidak bisa ditangkap per kata. */
+    const dari = A.join(' '), ke = B.join(' '), kunci = dari.toLowerCase();
+    if(kunci !== ke.toLowerCase() && !A.some(x => /\d/.test(x)) && !(KK.frasa[kunci] && KK.frasa[kunci].ke === ke)){
+      u.dari = dari; u.ke = ke; u.frasa = true;
+    }
+  }else if(A.length === 1 && B.length >= 1){
+    const a = A[0].toLowerCase(), b = B.join(' '), bl = b.toLowerCase();
     if(a !== bl && b.length >= 2){
       const prev = p ? ta[p-1].toLowerCase() : '';
       const sudah = kataDikenal(a, v)
@@ -3550,7 +3594,8 @@ function usulanDariSuntingan(lama, baru){
     if(!u.kosa.includes(w0)) u.kosa.push(w0);
   });
   // kata pengganti yang juga kata baru cukup tampil sekali, tapi tetap ikut dikenal
-  u.kosaTampil = u.kosa.filter(w => !u.ke || w.toLowerCase() !== u.ke.toLowerCase());
+  // untuk frasa, kata-kata barunya sudah tampak di "→ …" dan tetap tersimpan diam-diam sebagai kosakata
+  u.kosaTampil = u.frasa ? [] : u.kosa.filter(w => !u.ke || w.toLowerCase() !== u.ke.toLowerCase());
   return (u.dari || u.kosa.length) ? u : null;
 }
 /** Menyimpan usulan yang disetujui PTP ke ingatan koreksi (ikut dibagi antar-laptop). */
@@ -3558,7 +3603,9 @@ function simpanUsulan(u){
   u.kosa.forEach(w0 => { KK.kosa[w0.toLowerCase()] = Date.now(); });
   if(u.dari){
     const a = u.dari.toLowerCase(), b = u.ke;
-    if(kataDikenal(a, kosakata())){
+    if(u.frasa){
+      KK.frasa[a] = {ke: b, n: ((KK.frasa[a] || {}).n || 0) + 1, t: Date.now()};
+    }else if(kataDikenal(a, kosakata())){
       const k = u.prev + ' ' + a;
       KK.konteks[k] = {ke: b, n: ((KK.konteks[k] || {}).n || 0) + 1, t: Date.now()};
     }else{
@@ -3863,6 +3910,7 @@ function pasangPeriksa(field, o){
     KK.tolak[a + '>' + b] = Date.now();
     KK.kenal[a] = Date.now();
     if(KK.ganti[a] && KK.ganti[a].ke.toLowerCase() === b) delete KK.ganti[a];
+    if(KK.frasa[a] && KK.frasa[a].ke.toLowerCase() === b) delete KK.frasa[a];
     Object.keys(KK.konteks).forEach(k => { if(k.endsWith(' ' + a) && KK.konteks[k].ke.toLowerCase() === b) delete KK.konteks[k]; });
     simpanKK();
     catatanKK = catatanKK.filter(x => x !== c);
@@ -7289,7 +7337,7 @@ function tampilSetBersama(){
   const el = $id('setBersama');
   if(!el) return;
   const b = kkBersama;
-  const jumlahIngat = Object.keys(KKe.ganti).length + Object.keys(KKe.konteks).length + Object.keys(KKe.kosa).length;
+  const jumlahIngat = Object.keys(KKe.ganti).length + Object.keys(KKe.konteks).length + Object.keys(KKe.frasa).length + Object.keys(KKe.kosa).length;
   if(location.protocol === 'file:' || b.tanpaServer){
     el.innerHTML = `<p>Berbagi ingatan hanya jalan bila ORBIT dibuka lewat <b>ORBIT-execute.bat</b>.
       Saat ini ingatan hanya tersimpan di laptop ini (${jumlahIngat} pembetulan).</p>`;
@@ -7358,6 +7406,7 @@ function daftarIngatan(){
   Object.entries(KKe.ganti).forEach(([a, g]) => d.push({jenis: 'ganti', kunci: a, kata: a, teks: a + ' → ' + g.ke, ke: g.ke}));
   Object.entries(KKe.konteks).forEach(([k, g]) => d.push({jenis: 'konteks', kunci: k, kata: k.split(' ').pop(),
     teks: k + ' → ' + k.split(' ').slice(0, -1).join(' ') + ' ' + g.ke, ke: g.ke}));
+  Object.entries(KKe.frasa).forEach(([a, g]) => d.push({jenis: 'frasa', kunci: a, kata: a, teks: a + ' → ' + g.ke, ke: g.ke}));
   Object.keys(KKe.kosa).forEach(w => d.push({jenis: 'kosa', kunci: w, kata: w, teks: w}));
   return d.sort((x, y) => x.teks.localeCompare(y.teks));
 }
@@ -7388,9 +7437,9 @@ function hapusIngatan(jenis, kunci){
     KK.kosaHapus[kunci] = t;
     delete KK.kosa[kunci];
   }else{
-    const g = (jenis === 'ganti' ? KKe.ganti : KKe.konteks)[kunci];
+    const g = ({ganti: KKe.ganti, konteks: KKe.konteks, frasa: KKe.frasa})[jenis][kunci];
     if(!g) return;
-    const kata = jenis === 'ganti' ? kunci : kunci.split(' ').pop();
+    const kata = jenis === 'konteks' ? kunci.split(' ').pop() : kunci;
     KK.tolak[kata + '>' + g.ke.toLowerCase()] = t;
     delete KK[jenis][kunci];
   }
